@@ -1,0 +1,25 @@
+/* Fusion de codigo - Resolver conflictos 
+ * git fetch origin
+ *  
+ * git checkout -b test-branch remotes/origin/other-branch      - Crear branch de prueba a partir de la rama con los cambios
+ * 
+ * git merge vKrls-branch               - Mergear de mi rama y resolver conflictos
+ * 
+ * git add .
+ * git commit -m "Conflictos solucionados"
+ * 
+ * git checkout vKrls-branch            - Copio los cambios a mi rama
+ * git merge test-branch
+ * 
+ * git push origin vKrls-branch         - Pusheo -> espero confirmacion -> hago pull request
+ */
+/* Traer cambios
+ * git fetch origin                     - traer cambios de las ramas remotas
+ * git checkout remotes/origin/branch   - pruebo cambios y confirmo el pull request
+ * 
+ * git checkout main
+ * git pull origin main                 - traes cambios de origin main (remoto) -> main (local)
+ * 
+ * git checkout branch                  - me muevo a mi rama
+ * git merge main                       - mergeo cambios del main a mi rama
+ */
