@@ -1,0 +1,26 @@
+# Dependencias de Node.js (¡La más importante!)
+node_modules/
+
+# Archivos basura del sistema operativo Mac (Tu máquina)
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Archivos basura de Windows (Las máquinas de tus compañeros)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archivos de configuración local y variables de entorno (Seguridad)
+.env
+.env.local
+
+# Logs de errores de npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Carpetas de compilación (Por si más adelante empaquetan la app en un .exe o .app)
+dist/
+out/
+build/
