@@ -5,6 +5,7 @@ node_modules/
 .DS_Store
 .AppleDouble
 .LSOverride
+.txt
 
 # Archivos basura de Windows (Las máquinas de tus compañeros)
 Thumbs.db
@@ -24,3 +25,4 @@ yarn-error.log*
 dist/
 out/
 build/
+
