@@ -1,0 +1,485 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R 20 0 R] /Count 8 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 3817 >>
+stream
+BT /F2 24.0 Tf 52.00 775.89 Td (PoorChat) Tj ET
+BT /F1 10.6 Tf 52.00 733.89 Td (Plan técnico, división de trabajo y tareas secuenciales.) Tj ET
+BT /F1 10.6 Tf 52.00 713.89 Td (Proyecto de aplicación cliente-servidor para mensajería, transferencia de archivos,) Tj ET
+BT /F1 10.6 Tf 52.00 699.89 Td (llamadas y videollamadas usando sockets, TCP, UDP, POO, patrones de diseño y diagramas) Tj ET
+BT /F1 10.6 Tf 52.00 685.89 Td (UML.) Tj ET
+BT /F1 10.6 Tf 52.00 665.89 Td (Fecha de referencia: 16 de junio de 2026.) Tj ET
+BT /F2 16.0 Tf 52.00 633.89 Td (1. Estado actual del proyecto) Tj ET
+BT /F1 10.6 Tf 52.00 604.89 Td (El repositorio ya tiene una estructura base por carpetas. La aplicación está orientada a) Tj ET
+BT /F1 10.6 Tf 52.00 590.89 Td (Electron: src/main.js abre la ventana principal y carga src/ui/index.html. La mayoría de) Tj ET
+BT /F1 10.6 Tf 52.00 576.89 Td (módulos técnicos todavía están vacíos, por lo que es buen momento para definir) Tj ET
+BT /F1 10.6 Tf 52.00 562.89 Td (responsabilidades antes de implementar.) Tj ET
+BT /F1 10.6 Tf 52.00 542.89 Td (Rutas actuales importantes:) Tj ET
+BT /F1 10.3 Tf 66.00 522.89 Td (- src/main.js: proceso principal de Electron. Crea la ventana y carga la interfaz.) Tj ET
+BT /F1 10.3 Tf 66.00 509.89 Td (- src/ui/: interfaz, renderer, preload y estilos. Actualmente solo hay HTML inicial.) Tj ET
+BT /F1 10.3 Tf 66.00 496.89 Td (- src/server/: servidor TCP, manejo de clientes y ruteo de mensajes. Todavía vacío.) Tj ET
+BT /F1 10.3 Tf 66.00 483.89 Td (- src/network/: abstracciones de conexión TCP, UDP y configuración de puertos. Todavía) Tj ET
+BT /F1 10.3 Tf 66.00 470.89 Td (  vacío.) Tj ET
+BT /F1 10.3 Tf 66.00 457.89 Td (- src/handlers/: lógica de mensajes de texto y archivos. Todavía vacío.) Tj ET
+BT /F1 10.3 Tf 66.00 444.89 Td (- src/audio/ y src/video/: envío y recepción de audio/video por UDP. Todavía vacío.) Tj ET
+BT /F1 10.3 Tf 66.00 431.89 Td (- src/util/: funciones auxiliares de tiempo, archivos y validación. Todavía vacío.) Tj ET
+BT /F1 10.6 Tf 52.00 412.89 Td (La estructura está bien como punto de partida, pero todavía falta separar) Tj ET
+BT /F1 10.6 Tf 52.00 398.89 Td (responsabilidades centrales: cliente, protocolo, modelos y autenticación.) Tj ET
+BT /F2 16.0 Tf 52.00 366.89 Td (2. Idea de arquitectura) Tj ET
+BT /F1 10.6 Tf 52.00 337.89 Td (La aplicación debe separar claramente el tráfico confiable del tráfico en tiempo real.) Tj ET
+BT /F1 10.3 Tf 66.00 317.89 Td (- TCP: login, mensajes, archivos, historial, control de sesión y control de llamadas.) Tj ET
+BT /F1 10.3 Tf 66.00 304.89 Td (- UDP: audio y video en tiempo real.) Tj ET
+BT /F1 10.3 Tf 66.00 291.89 Td (- POO: usuarios, mensajes, sesiones, transferencias de archivos y llamadas.) Tj ET
+BT /F1 10.3 Tf 66.00 278.89 Td (- Patrones de diseño: Observer/EventEmitter, Factory, Strategy, Singleton/Config y) Tj ET
+BT /F1 10.3 Tf 66.00 265.89 Td (  Command.) Tj ET
+BT /F1 10.3 Tf 66.00 252.89 Td (- UML: clases, secuencias de login, mensaje, archivo y llamada.) Tj ET
+BT /F1 10.6 Tf 52.00 233.89 Td (Comunicación principal por TCP:) Tj ET
+BT /F3 8.8 Tf 60.00 207.89 Td (Cliente Electron 1) Tj ET
+BT /F3 8.8 Tf 60.00 196.89 Td (Cliente Electron 2) Tj ET
+BT /F3 8.8 Tf 60.00 185.89 Td (Cliente Electron 3) Tj ET
+BT /F3 8.8 Tf 60.00 174.89 Td (|) Tj ET
+BT /F3 8.8 Tf 60.00 163.89 Td (| TCP: login, mensajes, archivos, control de llamadas) Tj ET
+BT /F3 8.8 Tf 60.00 152.89 Td (v) Tj ET
+BT /F3 8.8 Tf 60.00 141.89 Td (Servidor central Node.js) Tj ET
+BT /F3 8.8 Tf 60.00 130.89 Td (^) Tj ET
+BT /F3 8.8 Tf 60.00 119.89 Td (|) Tj ET
+BT /F3 8.8 Tf 60.00 108.89 Td (| TCP) Tj ET
+BT /F3 8.8 Tf 60.00 97.89 Td (Cliente Electron N) Tj ET
+BT /F1 10.6 Tf 52.00 72.89 Td (Comunicación multimedia por UDP:) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 1 de 8) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 9 0 R >>
+endobj
+9 0 obj
+<< /Length 3312 >>
+stream
+BT /F3 8.8 Tf 60.00 771.89 Td (Cliente A <------ UDP audio/video ------> Cliente B) Tj ET
+BT /F1 10.6 Tf 52.00 746.89 Td (El inicio de una llamada no debe ocurrir directamente por UDP. Primero se negocia por) Tj ET
+BT /F1 10.6 Tf 52.00 732.89 Td (TCP: un cliente solicita llamar, el servidor avisa al destinatario, el destinatario) Tj ET
+BT /F1 10.6 Tf 52.00 718.89 Td (acepta o rechaza y luego ambos clientes abren el canal UDP para enviar paquetes) Tj ET
+BT /F1 10.6 Tf 52.00 704.89 Td (multimedia.) Tj ET
+BT /F3 8.8 Tf 60.00 678.89 Td (Cliente A -TCP-> Servidor: CALL_REQUEST a Cliente B) Tj ET
+BT /F3 8.8 Tf 60.00 667.89 Td (Servidor -TCP-> Cliente B: llamada entrante) Tj ET
+BT /F3 8.8 Tf 60.00 656.89 Td (Cliente B -TCP-> Servidor: CALL_ACCEPT) Tj ET
+BT /F3 8.8 Tf 60.00 645.89 Td (Servidor -TCP-> Ambos: datos de sesión) Tj ET
+BT /F3 8.8 Tf 60.00 634.89 Td (Cliente A <-UDP-> Cliente B: audio/video) Tj ET
+BT /F2 16.0 Tf 52.00 597.89 Td (3. División recomendada para 3 integrantes) Tj ET
+BT /F2 12.5 Tf 52.00 560.89 Td (Integrante 1: Servidor, TCP y login) Tj ET
+BT /F1 10.6 Tf 52.00 538.89 Td (Este integrante debe construir el núcleo del sistema. Su objetivo es que varios clientes) Tj ET
+BT /F1 10.6 Tf 52.00 524.89 Td (puedan conectarse, autenticarse y comunicarse mediante el servidor.) Tj ET
+BT /F1 10.6 Tf 52.00 504.89 Td (Archivos principales:) Tj ET
+BT /F1 10.3 Tf 66.00 484.89 Td (- src/server/server.js) Tj ET
+BT /F1 10.3 Tf 66.00 471.89 Td (- src/server/clientHandler.js) Tj ET
+BT /F1 10.3 Tf 66.00 458.89 Td (- src/network/tcpConnection.js) Tj ET
+BT /F1 10.6 Tf 52.00 439.89 Td (Carpetas sugeridas:) Tj ET
+BT /F1 10.3 Tf 66.00 419.89 Td (- src/auth/) Tj ET
+BT /F1 10.3 Tf 66.00 406.89 Td (- src/models/) Tj ET
+BT /F1 10.3 Tf 66.00 393.89 Td (- src/protocol/) Tj ET
+BT /F1 10.6 Tf 52.00 374.89 Td (Clases sugeridas:) Tj ET
+BT /F1 10.3 Tf 66.00 354.89 Td (- Server) Tj ET
+BT /F1 10.3 Tf 66.00 341.89 Td (- ClientHandler) Tj ET
+BT /F1 10.3 Tf 66.00 328.89 Td (- SessionManager) Tj ET
+BT /F1 10.3 Tf 66.00 315.89 Td (- User) Tj ET
+BT /F1 10.3 Tf 66.00 302.89 Td (- AuthService) Tj ET
+BT /F1 10.3 Tf 66.00 289.89 Td (- MessageRouter) Tj ET
+BT /F1 10.6 Tf 52.00 270.89 Td (Responsabilidades:) Tj ET
+BT /F1 10.3 Tf 66.00 250.89 Td (- Crear servidor TCP con net.createServer.) Tj ET
+BT /F1 10.3 Tf 66.00 237.89 Td (- Manejar varios clientes conectados.) Tj ET
+BT /F1 10.3 Tf 66.00 224.89 Td (- Implementar login básico.) Tj ET
+BT /F1 10.3 Tf 66.00 211.89 Td (- Mantener una tabla de usuarios conectados.) Tj ET
+BT /F1 10.3 Tf 66.00 198.89 Td (- Enrutar mensajes de un cliente a otro.) Tj ET
+BT /F1 10.3 Tf 66.00 185.89 Td (- Validar que solo usuarios autenticados puedan enviar mensajes.) Tj ET
+BT /F1 10.6 Tf 52.00 166.89 Td (Patrones recomendados:) Tj ET
+BT /F1 10.3 Tf 66.00 146.89 Td (- Singleton para configuración de puertos.) Tj ET
+BT /F1 10.3 Tf 66.00 133.89 Td (- Observer/EventEmitter para eventos de conexión, mensaje y desconexión.) Tj ET
+BT /F1 10.3 Tf 66.00 120.89 Td (- Factory para crear mensajes según su tipo.) Tj ET
+BT /F1 10.3 Tf 66.00 107.89 Td (- Command para mapear tipos de mensaje a acciones del servidor.) Tj ET
+BT /F2 12.5 Tf 52.00 80.89 Td (Integrante 2: Cliente, UI, mensajes y archivos) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 2 de 8) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 11 0 R >>
+endobj
+11 0 obj
+<< /Length 3166 >>
+stream
+BT /F1 10.6 Tf 52.00 783.89 Td (Este integrante debe encargarse de la experiencia de usuario y de conectar la interfaz) Tj ET
+BT /F1 10.6 Tf 52.00 769.89 Td (con la capa TCP. Debe trabajar con cuidado la separación entre renderer, preload y lógica) Tj ET
+BT /F1 10.6 Tf 52.00 755.89 Td (Node.) Tj ET
+BT /F1 10.6 Tf 52.00 735.89 Td (Archivos principales:) Tj ET
+BT /F1 10.3 Tf 66.00 715.89 Td (- src/ui/index.html) Tj ET
+BT /F1 10.3 Tf 66.00 702.89 Td (- src/ui/renderer.js) Tj ET
+BT /F1 10.3 Tf 66.00 689.89 Td (- src/ui/preload.js) Tj ET
+BT /F1 10.3 Tf 66.00 676.89 Td (- src/handlers/textHandler.js) Tj ET
+BT /F1 10.3 Tf 66.00 663.89 Td (- src/handlers/fileHandler.js) Tj ET
+BT /F1 10.3 Tf 66.00 650.89 Td (- src/util/fileUtil.js) Tj ET
+BT /F1 10.6 Tf 52.00 631.89 Td (Carpeta sugerida:) Tj ET
+BT /F1 10.3 Tf 66.00 611.89 Td (- src/client/) Tj ET
+BT /F1 10.6 Tf 52.00 592.89 Td (Clases sugeridas:) Tj ET
+BT /F1 10.3 Tf 66.00 572.89 Td (- ChatClient) Tj ET
+BT /F1 10.3 Tf 66.00 559.89 Td (- TextHandler) Tj ET
+BT /F1 10.3 Tf 66.00 546.89 Td (- FileHandler) Tj ET
+BT /F1 10.3 Tf 66.00 533.89 Td (- FileTransfer) Tj ET
+BT /F1 10.3 Tf 66.00 520.89 Td (- Message) Tj ET
+BT /F1 10.6 Tf 52.00 501.89 Td (Responsabilidades:) Tj ET
+BT /F1 10.3 Tf 66.00 481.89 Td (- Pantalla de login.) Tj ET
+BT /F1 10.3 Tf 66.00 468.89 Td (- Pantalla de chat.) Tj ET
+BT /F1 10.3 Tf 66.00 455.89 Td (- Conexión TCP desde el cliente.) Tj ET
+BT /F1 10.3 Tf 66.00 442.89 Td (- Envío y recepción de mensajes.) Tj ET
+BT /F1 10.3 Tf 66.00 429.89 Td (- Selección y envío de archivos.) Tj ET
+BT /F1 10.3 Tf 66.00 416.89 Td (- Guardado de archivos recibidos.) Tj ET
+BT /F1 10.3 Tf 66.00 403.89 Td (- Integración segura con Electron usando preload.js e IPC.) Tj ET
+BT /F1 10.6 Tf 52.00 384.89 Td (Regla importante: el renderer de Electron no debería usar Node directamente. Lo correcto) Tj ET
+BT /F1 10.6 Tf 52.00 370.89 Td (es:) Tj ET
+BT /F3 8.8 Tf 60.00 344.89 Td (renderer.js -> preload.js -> main.js / cliente TCP) Tj ET
+BT /F2 12.5 Tf 52.00 311.89 Td (Integrante 3: UDP, audio, video y llamadas) Tj ET
+BT /F1 10.6 Tf 52.00 289.89 Td (Este integrante debe encargarse de la parte más experimental del proyecto. Conviene) Tj ET
+BT /F1 10.6 Tf 52.00 275.89 Td (empezar con pruebas UDP simples y luego avanzar hacia audio y video reales.) Tj ET
+BT /F1 10.6 Tf 52.00 255.89 Td (Archivos principales:) Tj ET
+BT /F1 10.3 Tf 66.00 235.89 Td (- src/network/udpConnection.js) Tj ET
+BT /F1 10.3 Tf 66.00 222.89 Td (- src/audio/audioSender.js) Tj ET
+BT /F1 10.3 Tf 66.00 209.89 Td (- src/audio/audioReceiver.js) Tj ET
+BT /F1 10.3 Tf 66.00 196.89 Td (- src/video/videoSender.js) Tj ET
+BT /F1 10.3 Tf 66.00 183.89 Td (- src/video/videoReceiver.js) Tj ET
+BT /F1 10.6 Tf 52.00 164.89 Td (Clases sugeridas:) Tj ET
+BT /F1 10.3 Tf 66.00 144.89 Td (- UdpConnection) Tj ET
+BT /F1 10.3 Tf 66.00 131.89 Td (- CallSession) Tj ET
+BT /F1 10.3 Tf 66.00 118.89 Td (- AudioSender) Tj ET
+BT /F1 10.3 Tf 66.00 105.89 Td (- AudioReceiver) Tj ET
+BT /F1 10.3 Tf 66.00 92.89 Td (- VideoSender) Tj ET
+BT /F1 10.3 Tf 66.00 79.89 Td (- VideoReceiver) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 3 de 8) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 13 0 R >>
+endobj
+13 0 obj
+<< /Length 3395 >>
+stream
+BT /F1 10.3 Tf 66.00 783.89 Td (- MediaPacket) Tj ET
+BT /F1 10.6 Tf 52.00 764.89 Td (Responsabilidades:) Tj ET
+BT /F1 10.3 Tf 66.00 744.89 Td (- Crear socket UDP con dgram.) Tj ET
+BT /F1 10.3 Tf 66.00 731.89 Td (- Implementar handshake de llamada.) Tj ET
+BT /F1 10.3 Tf 66.00 718.89 Td (- Enviar paquetes de audio.) Tj ET
+BT /F1 10.3 Tf 66.00 705.89 Td (- Recibir y reproducir audio.) Tj ET
+BT /F1 10.3 Tf 66.00 692.89 Td (- Enviar video en baja resolución/FPS.) Tj ET
+BT /F1 10.3 Tf 66.00 679.89 Td (- Controlar pérdida o desorden de paquetes usando sequence y timestamp.) Tj ET
+BT /F1 10.6 Tf 52.00 660.89 Td (Para video por UDP, lo más seguro es empezar simple: capturar frames desde la cámara,) Tj ET
+BT /F1 10.6 Tf 52.00 646.89 Td (comprimirlos como JPEG/WebP, dividirlos en paquetes pequeños y reconstruirlos del otro) Tj ET
+BT /F1 10.6 Tf 52.00 632.89 Td (lado. Primero prueben UDP con texto o audio simulado, luego audio real, luego video.) Tj ET
+BT /F2 16.0 Tf 52.00 600.89 Td (4. Estructura recomendada) Tj ET
+BT /F1 10.6 Tf 52.00 571.89 Td (La estructura actual puede evolucionar sin romper lo existente. Lo más importante es) Tj ET
+BT /F1 10.6 Tf 52.00 557.89 Td (agregar carpetas para protocolo, modelos, cliente y autenticación.) Tj ET
+BT /F3 8.8 Tf 60.00 531.89 Td (src/) Tj ET
+BT /F3 8.8 Tf 60.00 520.89 Td (main.js) Tj ET
+BT /F3 8.8 Tf 60.00 509.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 498.89 Td (client/) Tj ET
+BT /F3 8.8 Tf 60.00 487.89 Td (chatClient.js) Tj ET
+BT /F3 8.8 Tf 60.00 476.89 Td (clientState.js) Tj ET
+BT /F3 8.8 Tf 60.00 465.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 454.89 Td (server/) Tj ET
+BT /F3 8.8 Tf 60.00 443.89 Td (server.js) Tj ET
+BT /F3 8.8 Tf 60.00 432.89 Td (clientHandler.js) Tj ET
+BT /F3 8.8 Tf 60.00 421.89 Td (sessionManager.js) Tj ET
+BT /F3 8.8 Tf 60.00 410.89 Td (messageRouter.js) Tj ET
+BT /F3 8.8 Tf 60.00 399.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 388.89 Td (network/) Tj ET
+BT /F3 8.8 Tf 60.00 377.89 Td (tcpConnection.js) Tj ET
+BT /F3 8.8 Tf 60.00 366.89 Td (udpConnection.js) Tj ET
+BT /F3 8.8 Tf 60.00 355.89 Td (puertos.js) Tj ET
+BT /F3 8.8 Tf 60.00 344.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 333.89 Td (protocol/) Tj ET
+BT /F3 8.8 Tf 60.00 322.89 Td (messageTypes.js) Tj ET
+BT /F3 8.8 Tf 60.00 311.89 Td (tcpProtocol.js) Tj ET
+BT /F3 8.8 Tf 60.00 300.89 Td (udpProtocol.js) Tj ET
+BT /F3 8.8 Tf 60.00 289.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 278.89 Td (models/) Tj ET
+BT /F3 8.8 Tf 60.00 267.89 Td (User.js) Tj ET
+BT /F3 8.8 Tf 60.00 256.89 Td (Message.js) Tj ET
+BT /F3 8.8 Tf 60.00 245.89 Td (FileTransfer.js) Tj ET
+BT /F3 8.8 Tf 60.00 234.89 Td (CallSession.js) Tj ET
+BT /F3 8.8 Tf 60.00 223.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 212.89 Td (handlers/) Tj ET
+BT /F3 8.8 Tf 60.00 201.89 Td (textHandler.js) Tj ET
+BT /F3 8.8 Tf 60.00 190.89 Td (fileHandler.js) Tj ET
+BT /F3 8.8 Tf 60.00 179.89 Td (callHandler.js) Tj ET
+BT /F3 8.8 Tf 60.00 168.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 157.89 Td (auth/) Tj ET
+BT /F3 8.8 Tf 60.00 146.89 Td (authService.js) Tj ET
+BT /F3 8.8 Tf 60.00 135.89 Td (userRepository.js) Tj ET
+BT /F3 8.8 Tf 60.00 124.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 113.89 Td (audio/) Tj ET
+BT /F3 8.8 Tf 60.00 102.89 Td (audioSender.js) Tj ET
+BT /F3 8.8 Tf 60.00 91.89 Td (audioReceiver.js) Tj ET
+BT /F3 8.8 Tf 60.00 80.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 69.89 Td (video/) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 4 de 8) Tj ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 15 0 R >>
+endobj
+15 0 obj
+<< /Length 2890 >>
+stream
+BT /F3 8.8 Tf 60.00 783.89 Td (videoSender.js) Tj ET
+BT /F3 8.8 Tf 60.00 772.89 Td (videoReceiver.js) Tj ET
+BT /F3 8.8 Tf 60.00 761.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 750.89 Td (util/) Tj ET
+BT /F3 8.8 Tf 60.00 739.89 Td (timeUtil.js) Tj ET
+BT /F3 8.8 Tf 60.00 728.89 Td (fileUtil.js) Tj ET
+BT /F3 8.8 Tf 60.00 717.89 Td () Tj ET
+BT /F3 8.8 Tf 60.00 706.89 Td (ui/) Tj ET
+BT /F3 8.8 Tf 60.00 695.89 Td (index.html) Tj ET
+BT /F3 8.8 Tf 60.00 684.89 Td (styles.css) Tj ET
+BT /F3 8.8 Tf 60.00 673.89 Td (renderer.js) Tj ET
+BT /F3 8.8 Tf 60.00 662.89 Td (preload.js) Tj ET
+BT /F2 16.0 Tf 52.00 625.89 Td (5. Protocolo base) Tj ET
+BT /F1 10.6 Tf 52.00 596.89 Td (Antes de programar muchas pantallas, conviene definir el formato de mensajes. Esto) Tj ET
+BT /F1 10.6 Tf 52.00 582.89 Td (permite que servidor, cliente y handlers avancen en paralelo usando el mismo contrato.) Tj ET
+BT /F1 10.6 Tf 52.00 562.89 Td (Mensaje TCP sugerido:) Tj ET
+BT /F3 8.8 Tf 60.00 536.89 Td ({) Tj ET
+BT /F3 8.8 Tf 60.00 525.89 Td ("type": "LOGIN",) Tj ET
+BT /F3 8.8 Tf 60.00 514.89 Td ("payload": {) Tj ET
+BT /F3 8.8 Tf 60.00 503.89 Td ("username": "carlos",) Tj ET
+BT /F3 8.8 Tf 60.00 492.89 Td ("password": "1234") Tj ET
+BT /F3 8.8 Tf 60.00 481.89 Td (}) Tj ET
+BT /F3 8.8 Tf 60.00 470.89 Td (}) Tj ET
+BT /F1 10.6 Tf 52.00 445.89 Td (Tipos TCP mínimos:) Tj ET
+BT /F1 10.3 Tf 66.00 425.89 Td (- LOGIN) Tj ET
+BT /F1 10.3 Tf 66.00 412.89 Td (- LOGIN_OK) Tj ET
+BT /F1 10.3 Tf 66.00 399.89 Td (- LOGIN_ERROR) Tj ET
+BT /F1 10.3 Tf 66.00 386.89 Td (- TEXT_MESSAGE) Tj ET
+BT /F1 10.3 Tf 66.00 373.89 Td (- FILE_START) Tj ET
+BT /F1 10.3 Tf 66.00 360.89 Td (- FILE_CHUNK) Tj ET
+BT /F1 10.3 Tf 66.00 347.89 Td (- FILE_END) Tj ET
+BT /F1 10.3 Tf 66.00 334.89 Td (- CALL_REQUEST) Tj ET
+BT /F1 10.3 Tf 66.00 321.89 Td (- CALL_ACCEPT) Tj ET
+BT /F1 10.3 Tf 66.00 308.89 Td (- CALL_REJECT) Tj ET
+BT /F1 10.3 Tf 66.00 295.89 Td (- CALL_END) Tj ET
+BT /F1 10.3 Tf 66.00 282.89 Td (- ERROR) Tj ET
+BT /F1 10.6 Tf 52.00 263.89 Td (Transferencia de archivos por TCP:) Tj ET
+BT /F3 8.8 Tf 60.00 237.89 Td (FILE_START: nombre, tamaño, tipo, emisor, receptor, transferId) Tj ET
+BT /F3 8.8 Tf 60.00 226.89 Td (FILE_CHUNK: transferId, chunkIndex, bytes) Tj ET
+BT /F3 8.8 Tf 60.00 215.89 Td (FILE_END: transferId) Tj ET
+BT /F1 10.6 Tf 52.00 190.89 Td (Paquete UDP sugerido:) Tj ET
+BT /F3 8.8 Tf 60.00 164.89 Td ({) Tj ET
+BT /F3 8.8 Tf 60.00 153.89 Td ("callId": "abc123",) Tj ET
+BT /F3 8.8 Tf 60.00 142.89 Td ("mediaType": "audio",) Tj ET
+BT /F3 8.8 Tf 60.00 131.89 Td ("sequence": 150,) Tj ET
+BT /F3 8.8 Tf 60.00 120.89 Td ("timestamp": 1710000000000,) Tj ET
+BT /F3 8.8 Tf 60.00 109.89 Td ("chunkIndex": 0,) Tj ET
+BT /F3 8.8 Tf 60.00 98.89 Td ("totalChunks": 1,) Tj ET
+BT /F3 8.8 Tf 60.00 87.89 Td ("payload": "bytes...") Tj ET
+BT /F3 8.8 Tf 60.00 76.89 Td (}) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 5 de 8) Tj ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 17 0 R >>
+endobj
+17 0 obj
+<< /Length 4212 >>
+stream
+BT /F1 10.6 Tf 52.00 777.89 Td (Para UDP se recomienda mantener paquetes pequeños, idealmente por debajo de 1200 bytes) Tj ET
+BT /F1 10.6 Tf 52.00 763.89 Td (cuando sea posible. Para video, un frame comprimido puede dividirse en varios paquetes y) Tj ET
+BT /F1 10.6 Tf 52.00 749.89 Td (reconstruirse usando sequence, chunkIndex y totalChunks.) Tj ET
+BT /F2 16.0 Tf 52.00 717.89 Td (6. Patrones de diseño aplicables) Tj ET
+BT /F1 10.3 Tf 66.00 688.89 Td (- Observer/EventEmitter: emitir eventos cuando llega un mensaje, archivo, solicitud de) Tj ET
+BT /F1 10.3 Tf 66.00 675.89 Td (  llamada o desconexión.) Tj ET
+BT /F1 10.3 Tf 66.00 662.89 Td (- Factory Method: crear objetos de mensaje según el campo type.) Tj ET
+BT /F1 10.3 Tf 66.00 649.89 Td (- Strategy: elegir transporte, TCP para mensajes/archivos y UDP para audio/video.) Tj ET
+BT /F1 10.3 Tf 66.00 636.89 Td (- Singleton/Config: centralizar puertos, host, rutas y constantes de la aplicación.) Tj ET
+BT /F1 10.3 Tf 66.00 623.89 Td (- Command: mapear cada tipo de mensaje TCP a una acción específica del servidor.) Tj ET
+BT /F2 16.0 Tf 52.00 592.89 Td (7. Diagramas UML necesarios) Tj ET
+BT /F1 10.3 Tf 68.00 563.89 Td (1. Diagrama de clases: Server, ClientHandler, ChatClient, User, Message, FileTransfer,) Tj ET
+BT /F1 10.3 Tf 68.00 550.89 Td (   CallSession, TcpConnection, UdpConnection.) Tj ET
+BT /F1 10.3 Tf 68.00 537.89 Td (2. Diagrama de secuencia de login.) Tj ET
+BT /F1 10.3 Tf 68.00 524.89 Td (3. Diagrama de secuencia de mensaje de texto.) Tj ET
+BT /F1 10.3 Tf 68.00 511.89 Td (4. Diagrama de secuencia de transferencia de archivo.) Tj ET
+BT /F1 10.3 Tf 68.00 498.89 Td (5. Diagrama de secuencia de llamada o videollamada: señalización por TCP y media por) Tj ET
+BT /F1 10.3 Tf 68.00 485.89 Td (   UDP.) Tj ET
+BT /F1 10.3 Tf 68.00 472.89 Td (6. Diagrama de componentes: UI, cliente, servidor, protocolo, handlers, audio/video.) Tj ET
+BT /F2 16.0 Tf 52.00 441.89 Td (8. Tareas secuenciales para completar el proyecto) Tj ET
+BT /F1 10.6 Tf 52.00 412.89 Td (Estas tareas están ordenadas por dependencia. No conviene saltar directamente a video o) Tj ET
+BT /F1 10.6 Tf 52.00 398.89 Td (UI final sin tener primero el protocolo, el servidor y la mensajería básica.) Tj ET
+BT /F2 12.5 Tf 52.00 370.89 Td (Fase 0: Organización inicial) Tj ET
+BT /F1 10.3 Tf 68.00 348.89 Td (1. Crear ramas de trabajo para cada integrante: server-tcp-login, client-ui-files,) Tj ET
+BT /F1 10.3 Tf 68.00 335.89 Td (   udp-calls-media.) Tj ET
+BT /F1 10.3 Tf 68.00 322.89 Td (2. Agregar carpetas faltantes: src/client, src/protocol, src/models, src/auth.) Tj ET
+BT /F1 10.3 Tf 68.00 309.89 Td (3. Definir convenciones: nombres de clases, formato de commits, puertos y estilo de) Tj ET
+BT /F1 10.3 Tf 68.00 296.89 Td (   mensajes JSON.) Tj ET
+BT /F1 10.3 Tf 68.00 283.89 Td (4. Crear un README con instrucciones para ejecutar servidor y cliente.) Tj ET
+BT /F2 12.5 Tf 52.00 256.89 Td (Fase 1: Protocolo común) Tj ET
+BT /F1 10.3 Tf 68.00 234.89 Td (1. Crear messageTypes.js con todos los tipos TCP y UDP.) Tj ET
+BT /F1 10.3 Tf 68.00 221.89 Td (2. Crear tcpProtocol.js con funciones para serializar y parsear mensajes JSON.) Tj ET
+BT /F1 10.3 Tf 68.00 208.89 Td (3. Definir cómo separar mensajes TCP. Recomendación: JSON por línea usando \\n como) Tj ET
+BT /F1 10.3 Tf 68.00 195.89 Td (   delimitador.) Tj ET
+BT /F1 10.3 Tf 68.00 182.89 Td (4. Crear validadores mínimos para evitar mensajes sin type o sin payload.) Tj ET
+BT /F1 10.3 Tf 68.00 169.89 Td (5. Documentar ejemplos de cada mensaje en el README.) Tj ET
+BT /F2 12.5 Tf 52.00 142.89 Td (Fase 2: Servidor TCP mínimo) Tj ET
+BT /F1 10.3 Tf 68.00 120.89 Td (1. Implementar server.js con net.createServer.) Tj ET
+BT /F1 10.3 Tf 68.00 107.89 Td (2. Implementar clientHandler.js para manejar conexión, datos recibidos y desconexión.) Tj ET
+BT /F1 10.3 Tf 68.00 94.89 Td (3. Crear una tabla en memoria de clientes conectados.) Tj ET
+BT /F1 10.3 Tf 68.00 81.89 Td (4. Agregar logs claros para conexión, mensaje recibido y desconexión.) Tj ET
+BT /F1 10.3 Tf 68.00 68.89 Td (5. Probar con clientes simples por consola antes de usar Electron.) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 6 de 8) Tj ET
+endstream
+endobj
+18 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 19 0 R >>
+endobj
+19 0 obj
+<< /Length 3872 >>
+stream
+BT /F2 12.5 Tf 52.00 769.89 Td (Fase 3: Login y sesiones) Tj ET
+BT /F1 10.3 Tf 68.00 747.89 Td (1. Crear AuthService y UserRepository.) Tj ET
+BT /F1 10.3 Tf 68.00 734.89 Td (2. Empezar con usuarios en memoria o archivo JSON local.) Tj ET
+BT /F1 10.3 Tf 68.00 721.89 Td (3. Implementar mensajes LOGIN, LOGIN_OK y LOGIN_ERROR.) Tj ET
+BT /F1 10.3 Tf 68.00 708.89 Td (4. Guardar en SessionManager qué socket pertenece a qué usuario.) Tj ET
+BT /F1 10.3 Tf 68.00 695.89 Td (5. Bloquear mensajes de usuarios no autenticados.) Tj ET
+BT /F2 12.5 Tf 52.00 668.89 Td (Fase 4: Cliente TCP y UI de login) Tj ET
+BT /F1 10.3 Tf 68.00 646.89 Td (1. Crear ChatClient para conectar al servidor por TCP.) Tj ET
+BT /F1 10.3 Tf 68.00 633.89 Td (2. Exponer funciones seguras desde preload.js hacia renderer.js.) Tj ET
+BT /F1 10.3 Tf 68.00 620.89 Td (3. Diseñar pantalla de login simple.) Tj ET
+BT /F1 10.3 Tf 68.00 607.89 Td (4. Mostrar estado de conexión: desconectado, conectando, conectado, error.) Tj ET
+BT /F1 10.3 Tf 68.00 594.89 Td (5. Probar login desde la interfaz Electron.) Tj ET
+BT /F2 12.5 Tf 52.00 567.89 Td (Fase 5: Mensajes de texto) Tj ET
+BT /F1 10.3 Tf 68.00 545.89 Td (1. Implementar TEXT_MESSAGE en el cliente.) Tj ET
+BT /F1 10.3 Tf 68.00 532.89 Td (2. Implementar ruteo de mensajes en el servidor usando MessageRouter.) Tj ET
+BT /F1 10.3 Tf 68.00 519.89 Td (3. Agregar lista de usuarios conectados.) Tj ET
+BT /F1 10.3 Tf 68.00 506.89 Td (4. Mostrar mensajes enviados y recibidos en la UI.) Tj ET
+BT /F1 10.3 Tf 68.00 493.89 Td (5. Probar con dos o más clientes conectados al mismo servidor.) Tj ET
+BT /F2 12.5 Tf 52.00 466.89 Td (Fase 6: Transferencia de archivos por TCP) Tj ET
+BT /F1 10.3 Tf 68.00 444.89 Td (1. Crear FileTransfer con id, nombre, tamaño, tipo, emisor y receptor.) Tj ET
+BT /F1 10.3 Tf 68.00 431.89 Td (2. Implementar FILE_START, FILE_CHUNK y FILE_END.) Tj ET
+BT /F1 10.3 Tf 68.00 418.89 Td (3. Enviar archivos por chunks, no como un JSON gigante.) Tj ET
+BT /F1 10.3 Tf 68.00 405.89 Td (4. Guardar archivos recibidos en una carpeta definida, por ejemplo downloads/.) Tj ET
+BT /F1 10.3 Tf 68.00 392.89 Td (5. Probar documentos, imágenes, audio y video pequeños.) Tj ET
+BT /F1 10.3 Tf 68.00 379.89 Td (6. Agregar progreso de envío y recepción en la UI.) Tj ET
+BT /F2 12.5 Tf 52.00 352.89 Td (Fase 7: Señalización de llamadas por TCP) Tj ET
+BT /F1 10.3 Tf 68.00 330.89 Td (1. Crear CallSession con callId, emisor, receptor, estado y puertos UDP.) Tj ET
+BT /F1 10.3 Tf 68.00 317.89 Td (2. Implementar CALL_REQUEST, CALL_ACCEPT, CALL_REJECT y CALL_END.) Tj ET
+BT /F1 10.3 Tf 68.00 304.89 Td (3. Mostrar llamada entrante en la UI.) Tj ET
+BT /F1 10.3 Tf 68.00 291.89 Td (4. Permitir aceptar, rechazar y colgar.) Tj ET
+BT /F1 10.3 Tf 68.00 278.89 Td (5. Confirmar que ambos clientes reciben los datos necesarios para iniciar UDP.) Tj ET
+BT /F2 12.5 Tf 52.00 251.89 Td (Fase 8: UDP básico) Tj ET
+BT /F1 10.3 Tf 68.00 229.89 Td (1. Implementar udpConnection.js usando dgram.) Tj ET
+BT /F1 10.3 Tf 68.00 216.89 Td (2. Enviar paquetes UDP de prueba entre dos clientes.) Tj ET
+BT /F1 10.3 Tf 68.00 203.89 Td (3. Agregar sequence y timestamp a cada paquete.) Tj ET
+BT /F1 10.3 Tf 68.00 190.89 Td (4. Medir pérdida o desorden de paquetes con logs.) Tj ET
+BT /F1 10.3 Tf 68.00 177.89 Td (5. Probar con IPs de Tailscale.) Tj ET
+BT /F2 12.5 Tf 52.00 150.89 Td (Fase 9: Audio por UDP) Tj ET
+BT /F1 10.3 Tf 68.00 128.89 Td (1. Capturar audio desde el cliente.) Tj ET
+BT /F1 10.3 Tf 68.00 115.89 Td (2. Dividir audio en paquetes pequeños.) Tj ET
+BT /F1 10.3 Tf 68.00 102.89 Td (3. Enviar audio por UDP con AudioSender.) Tj ET
+BT /F1 10.3 Tf 68.00 89.89 Td (4. Recibir y reproducir audio con AudioReceiver.) Tj ET
+BT /F1 10.3 Tf 68.00 76.89 Td (5. Agregar buffer pequeño para suavizar cortes.) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 7 de 8) Tj ET
+endstream
+endobj
+20 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 21 0 R >>
+endobj
+21 0 obj
+<< /Length 3765 >>
+stream
+BT /F1 10.3 Tf 68.00 783.89 Td (6. Probar llamada de audio entre dos clientes.) Tj ET
+BT /F2 12.5 Tf 52.00 756.89 Td (Fase 10: Video por UDP) Tj ET
+BT /F1 10.3 Tf 68.00 734.89 Td (1. Capturar frames desde cámara o pantalla.) Tj ET
+BT /F1 10.3 Tf 68.00 721.89 Td (2. Comprimir frames con calidad baja o media.) Tj ET
+BT /F1 10.3 Tf 68.00 708.89 Td (3. Dividir frames grandes en chunks UDP.) Tj ET
+BT /F1 10.3 Tf 68.00 695.89 Td (4. Reconstruir frames en el receptor.) Tj ET
+BT /F1 10.3 Tf 68.00 682.89 Td (5. Mostrar video remoto en la UI.) Tj ET
+BT /F1 10.3 Tf 68.00 669.89 Td (6. Reducir resolución o FPS si la red se satura.) Tj ET
+BT /F2 12.5 Tf 52.00 642.89 Td (Fase 11: Integración con Tailscale) Tj ET
+BT /F1 10.3 Tf 68.00 620.89 Td (1. Instalar Tailscale en los equipos de prueba.) Tj ET
+BT /F1 10.3 Tf 68.00 607.89 Td (2. Identificar la IP Tailscale del equipo servidor.) Tj ET
+BT /F1 10.3 Tf 68.00 594.89 Td (3. Configurar el servidor para escuchar en 0.0.0.0.) Tj ET
+BT /F1 10.3 Tf 68.00 581.89 Td (4. Configurar clientes para conectarse a la IP Tailscale del servidor.) Tj ET
+BT /F1 10.3 Tf 68.00 568.89 Td (5. Probar TCP primero: login, mensajes y archivos.) Tj ET
+BT /F1 10.3 Tf 68.00 555.89 Td (6. Probar UDP después: paquetes de prueba, audio y video.) Tj ET
+BT /F2 12.5 Tf 52.00 528.89 Td (Fase 12: UML y documentación final) Tj ET
+BT /F1 10.3 Tf 68.00 506.89 Td (1. Actualizar diagrama de clases con las clases reales implementadas.) Tj ET
+BT /F1 10.3 Tf 68.00 493.89 Td (2. Crear diagramas de secuencia de login, mensaje, archivo y llamada.) Tj ET
+BT /F1 10.3 Tf 68.00 480.89 Td (3. Crear diagrama de componentes.) Tj ET
+BT /F1 10.3 Tf 68.00 467.89 Td (4. Documentar cómo ejecutar servidor y cliente.) Tj ET
+BT /F1 10.3 Tf 68.00 454.89 Td (5. Documentar limitaciones conocidas: pérdida UDP, tamaño de archivos, seguridad del) Tj ET
+BT /F1 10.3 Tf 68.00 441.89 Td (   login.) Tj ET
+BT /F2 12.5 Tf 52.00 414.89 Td (Fase 13: Pruebas y cierre) Tj ET
+BT /F1 10.3 Tf 68.00 392.89 Td (1. Probar un cliente en la misma máquina que el servidor.) Tj ET
+BT /F1 10.3 Tf 68.00 379.89 Td (2. Probar dos clientes en la misma red.) Tj ET
+BT /F1 10.3 Tf 68.00 366.89 Td (3. Probar clientes por Tailscale.) Tj ET
+BT /F1 10.3 Tf 68.00 353.89 Td (4. Probar desconexiones inesperadas.) Tj ET
+BT /F1 10.3 Tf 68.00 340.89 Td (5. Probar login incorrecto, usuario duplicado, archivo grande y llamada rechazada.) Tj ET
+BT /F1 10.3 Tf 68.00 327.89 Td (6. Preparar demo final con un flujo completo: login, mensaje, archivo, llamada y) Tj ET
+BT /F1 10.3 Tf 68.00 314.89 Td (   videollamada.) Tj ET
+BT /F2 16.0 Tf 52.00 283.89 Td (9. Orden de prioridad) Tj ET
+BT /F1 10.6 Tf 52.00 254.89 Td (Si el tiempo es limitado, el orden mínimo viable debe ser:) Tj ET
+BT /F1 10.3 Tf 68.00 234.89 Td (1. Protocolo TCP.) Tj ET
+BT /F1 10.3 Tf 68.00 221.89 Td (2. Servidor multi-cliente.) Tj ET
+BT /F1 10.3 Tf 68.00 208.89 Td (3. Login.) Tj ET
+BT /F1 10.3 Tf 68.00 195.89 Td (4. Mensajes de texto.) Tj ET
+BT /F1 10.3 Tf 68.00 182.89 Td (5. Archivos por TCP.) Tj ET
+BT /F1 10.3 Tf 68.00 169.89 Td (6. Señalización de llamadas por TCP.) Tj ET
+BT /F1 10.3 Tf 68.00 156.89 Td (7. UDP simple.) Tj ET
+BT /F1 10.3 Tf 68.00 143.89 Td (8. Audio.) Tj ET
+BT /F1 10.3 Tf 68.00 130.89 Td (9. Video.) Tj ET
+BT /F1 10.3 Tf 68.00 117.89 Td (10. UML final y documentación.) Tj ET
+BT /F1 10.6 Tf 52.00 98.89 Td (La recomendación principal es no empezar por video. Primero deben tener una base sólida) Tj ET
+BT /F1 10.6 Tf 52.00 84.89 Td (de servidor, protocolo, login y mensajes. Con eso funcionando, archivos y llamadas se) Tj ET
+BT /F1 10.6 Tf 52.00 70.89 Td (vuelven extensiones naturales en lugar de problemas mezclados.) Tj ET
+BT /F1 8.5 Tf 52.00 28.00 Td (PoorChat - Plan tecnico | Pagina 8 de 8) Tj ET
+endstream
+endobj
+xref
+0 22
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000169 00000 n 
+0000000266 00000 n 
+0000000368 00000 n 
+0000000463 00000 n 
+0000000615 00000 n 
+0000004483 00000 n 
+0000004635 00000 n 
+0000007998 00000 n 
+0000008152 00000 n 
+0000011370 00000 n 
+0000011524 00000 n 
+0000014971 00000 n 
+0000015125 00000 n 
+0000018067 00000 n 
+0000018221 00000 n 
+0000022485 00000 n 
+0000022639 00000 n 
+0000026563 00000 n 
+0000026717 00000 n 
+trailer
+<< /Size 22 /Root 1 0 R >>
+startxref
+30534
+%%EOF
