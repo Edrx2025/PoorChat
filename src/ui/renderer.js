@@ -1,5 +1,9 @@
 // src/ui/renderer.js
 
+// --- ELEMENTOS DE LA ESTRUCTURA SEMÁNTICA (FORMULARIOS) ---
+const formLogin = document.getElementById("form-login");
+const formChatInput = document.getElementById("form-chat-input");
+
 // --- ELEMENTOS DE LA PANTALLA DE LOGIN ---
 const loginContainer = document.getElementById("login-container");
 const chatContainer = document.getElementById("chat-container");
@@ -14,20 +18,25 @@ const inputUsuario = document.getElementById("input-usuario");
 const userTag = document.getElementById("user-tag");
 const boxMensajes = document.getElementById("box-mensajes");
 const inputMensaje = document.getElementById("input-mensaje");
-const btnEnviar = document.getElementById("btn-enviar");
 
 // Variable local para almacenar la identidad del usuario logueado
 let miUsuario = "";
 
+// --- 🔐 GESTIÓN DEL FORMULARIO DE AUTENTICACIÓN (FASE 4) ---
+
 /**
- * Evento que dispara el intento de conexión de red local o remota
+ * Escucha el envío del formulario de login.
+ * Se dispara tanto al hacer clic en el botón como al presionar 'Enter' en los inputs.
  */
-btnConectar.addEventListener("click", () => {
+formLogin.addEventListener("submit", (e) => {
+  // ⚠️ CRÍTICO: Evita que la página web de Electron se recargue/refresque al enviar el formulario
+  e.preventDefault();
+
   const ip = inputIp.value.trim();
   const puerto = inputPuerto.value.trim();
   const usuario = inputUsuario.value.trim();
 
-  // Validación elemental de datos en el cliente
+  // El atributo 'required' de HTML5 ya hace el trabajo, pero mantenemos esto como un doble escudo de seguridad
   if (!ip || !puerto || !usuario) {
     lblEstado.innerText = "Error: Todos los campos son obligatorios";
     cambiarEstiloEstado("error");
@@ -39,13 +48,39 @@ btnConectar.addEventListener("click", () => {
   cambiarEstiloEstado("conectando");
   btnConectar.disabled = true;
 
-  // Ejecución segura de la conexión invocando al puente (preload.js)
+  // Invocación segura al puente del proceso principal (main.js)
   window.poorChatAPI.enviarLogin(ip, puerto, usuario);
 });
 
+// --- 💬 GESTIÓN DEL ENTRADA DE MENSAJES (FASE 5) ---
+
 /**
- * Escucha centralizada de respuestas de datos del Servidor (Señalización TCP)
+ * Escucha el envío del formulario de redacción del chat.
+ * Resuelve fluidamente el envío con la tecla Enter dentro del cuadro de texto.
  */
+formChatInput.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  const texto = inputMensaje.value.trim();
+
+  // Si el cuadro de mensaje está vacío, ignoramos la acción
+  if (!texto) return;
+
+  // Pinta inmediatamente tu propio mensaje en tu interfaz local en la columna derecha
+  renderizarBurbujaTexto(miUsuario, texto, true);
+
+  // Limpia el cuadro de texto para el próximo mensaje y le devuelve el foco del teclado
+  inputMensaje.value = "";
+  inputMensaje.focus();
+
+  /* 🚀 NOTA PARA MAÑANA (Fase 5):
+    Aquí añadirás la llamada a tu preload para empujar el texto al socket TCP:
+    window.poorChatAPI.enviarMensajeTexto(texto);
+  */
+});
+
+// --- 📡 RED Y SEÑALIZACIÓN TCP (ESCUCHA CENTRALIZADA) ---
+
 window.poorChatAPI.recibirRespuesta((mensaje) => {
   console.log("[Renderer] Datos recibidos desde la capa de red:", mensaje.type);
 
@@ -54,11 +89,12 @@ window.poorChatAPI.recibirRespuesta((mensaje) => {
       lblEstado.innerText = "Estado: Autenticado correctamente";
       cambiarEstiloEstado("conectado");
 
-      // Transición visual: Ocultamos el Login y desplegamos el Chat room
+      // Transición visual: Ocultamos la sección de login y desplegamos el área principal
       setTimeout(() => {
         loginContainer.style.display = "none";
         chatContainer.style.display = "flex";
         userTag.innerText = `@${miUsuario}`;
+        inputMensaje.focus(); // Coloca el cursor en el input del chat para mejorar la UX
       }, 800);
       break;
 
@@ -69,7 +105,7 @@ window.poorChatAPI.recibirRespuesta((mensaje) => {
       break;
 
     case "TEXT_MESSAGE":
-      // Gestión futura: Manejo automatizado de llegada de textos de terceros (Fase 5)
+      // Procesa y renderiza mensajes entrantes de otros compañeros en el chat room
       renderizarBurbujaTexto(
         mensaje.payload.emisor,
         mensaje.payload.text,
@@ -85,6 +121,8 @@ window.poorChatAPI.recibirRespuesta((mensaje) => {
   }
 });
 
+// --- 🛠️ FUNCIONES AUXILIARES DE RENDERIZADO Y ESTILOS ---
+
 /**
  * Modifica las clases CSS del texto de estado para actualizar los colores dinámicamente
  * @param {string} estado - Tipo de estado ("desconectado" | "conectando" | "conectado" | "error")
@@ -97,7 +135,7 @@ function cambiarEstiloEstado(estado) {
  * Genera de forma dinámica nodos HTML para pintar mensajes en pantalla
  * @param {string} emisor - Quién envía el mensaje
  * @param {string} texto - Cuerpo del mensaje
- * @param {boolean} esMio - Si el mensaje fue originado por el usuario actual
+ * @param {boolean} esMio - Si el mensaje fue originado por el usuario actual (true = derecha, false = izquierda)
  */
 function renderizarBurbujaTexto(emisor, texto, esMio) {
   const contenedorBurbuja = document.createElement("div");

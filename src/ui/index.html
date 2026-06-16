@@ -3,15 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PoorChat - WhatsApp Clone</title>
+    <title>PoorChat</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
+
   <body>
-    <div id="login-container" class="fullscreen-wrapper">
-      <div class="login-card">
-        <h1>PoorChat</h1>
-        <p>Ingresa los datos de red para conectarte</p>
-        <div class="login-form">
+    <section
+      id="login-container"
+      class="fullscreen-wrapper"
+      aria-label="Pantalla de inicio de sesión"
+    >
+      <article class="login-card">
+        <header class="login-header">
+          <h1>PoorChat</h1>
+          <p>Ingresa los datos de red para conectarte</p>
+        </header>
+
+        <form id="form-login" class="login-form" onsubmit="return false;">
           <div class="input-group">
             <label for="input-ip">Dirección IP del Servidor</label>
             <input
@@ -19,12 +27,13 @@
               id="input-ip"
               placeholder="Ej: 100.80.90.12 (Tailscale)"
               value="127.0.0.1"
+              required
             />
           </div>
 
           <div class="input-group">
             <label for="input-puerto">Puerto TCP</label>
-            <input type="number" id="input-puerto" value="5000" />
+            <input type="number" id="input-puerto" value="5000" required />
           </div>
 
           <div class="input-group">
@@ -32,33 +41,43 @@
             <input
               type="text"
               id="input-usuario"
-              placeholder="Ej: carlos_sistemas"
+              placeholder="Ej: Edrx2025"
               autocomplete="off"
+              required
             />
           </div>
 
-          <button id="btn-conectar" class="btn-primary">
+          <button type="submit" id="btn-conectar" class="btn-primary">
             Conectarse al Chat
           </button>
-        </div>
+        </form>
 
-        <div class="login-footer">
+        <footer class="login-footer">
           <p id="lbl-estado" class="status-text desconectado">
             Estado: Desconectado
           </p>
-        </div>
-      </div>
-    </div>
+        </footer>
+      </article>
+    </section>
 
     <div id="chat-container" class="app-wrapper" style="display: none">
       <aside class="sidebar">
-        <div class="sidebar-header">
+        <header class="sidebar-header">
           <h3>Contactos</h3>
           <span id="user-tag" class="badge">@usuario</span>
-        </div>
-        <div class="contacts-list" id="panel-contactos">
-          <div class="contact-item active">Sala General</div>
-        </div>
+        </header>
+
+        <nav
+          class="contacts-list"
+          id="panel-contactos"
+          aria-label="Lista de chats disponibles"
+        >
+          <ul style="list-style: none; margin: 0; padding: 0">
+            <li class="contact-item active" role="button" tabindex="0">
+              Sala General
+            </li>
+          </ul>
+        </nav>
       </aside>
 
       <main class="chat-main">
@@ -68,27 +87,64 @@
             <p id="chat-target-status">Conectados en el servidor</p>
           </div>
           <div class="chat-actions">
-            <button id="btn-llamar" class="btn-icon">📞</button>
-            <button id="btn-videollamar" class="btn-icon">📹</button>
+            <button
+              id="btn-llamar"
+              class="btn-icon"
+              title="Iniciar llamada de voz"
+            >
+              📞
+            </button>
+            <button
+              id="btn-videollamar"
+              class="btn-icon"
+              title="Iniciar videollamada"
+            >
+              📹
+            </button>
           </div>
         </header>
 
-        <div class="messages-area" id="box-mensajes">
+        <section
+          class="messages-area"
+          id="box-mensajes"
+          aria-label="Historial de conversación"
+        >
           <div class="system-message">
             Bienvenido a PoorChat. Los mensajes de texto y archivos viajan
             cifrados por TCP.
           </div>
-        </div>
+        </section>
 
         <footer class="chat-footer">
-          <button id="btn-adjuntar" class="btn-secondary">📎</button>
-          <input
-            type="text"
-            id="input-mensaje"
-            placeholder="Escribe un mensaje aquí..."
-            autocomplete="off"
-          />
-          <button id="btn-enviar" class="btn-send">Enviar</button>
+          <form
+            id="form-chat-input"
+            style="
+              display: flex;
+              width: 100%;
+              gap: inherit;
+              align-items: inherit;
+            "
+            onsubmit="return false;"
+          >
+            <button
+              type="button"
+              id="btn-adjuntar"
+              class="btn-secondary"
+              title="Adjuntar archivos y documentos"
+            >
+              📎
+            </button>
+            <input
+              type="text"
+              id="input-mensaje"
+              placeholder="Escribe un mensaje aquí..."
+              autocomplete="off"
+              required
+            />
+            <button type="submit" id="btn-enviar" class="btn-send">
+              Enviar
+            </button>
+          </form>
         </footer>
       </main>
     </div>
