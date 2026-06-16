@@ -1,7 +1,16 @@
+body {
+  background-color: rgba(10, 21, 35, 0.962);
+  color: azure;
+  text-align: center;
+}
+
 .login-header {
-  color: #041f46fe;
+  color: #ffd902fe;
   font-family: sans-serif;
 }
-body {
-  background-color: rgba(202, 226, 255, 0.288);
+
+#lbl-estado {
+  color: rgb(249, 203, 160);
+  font-weight: bold;
+  font-style: italic;
 }
