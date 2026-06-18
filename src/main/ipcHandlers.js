@@ -47,6 +47,39 @@ function registerIpcHandlers({
     sessionState.port = port;
   }
 
+  async function uploadBuffer(payload, fileBuffer, originalName, mimeType) {
+    const start = await tcpClient.request(MessageTypes.FILE_UPLOAD_START, {
+      contextType: payload.contextType,
+      contextId: payload.contextId,
+      originalName,
+      mimeType,
+      size: fileBuffer.length,
+    });
+
+    for (
+      let offset = 0;
+      offset < fileBuffer.length;
+      offset += config.fileChunkSize
+    ) {
+      const chunk = fileBuffer.subarray(offset, offset + config.fileChunkSize);
+      const progress = await tcpClient.request(
+        MessageTypes.FILE_UPLOAD_CHUNK,
+        {
+          transferId: start.transferId,
+          chunkBase64: chunk.toString("base64"),
+        },
+        30000,
+      );
+      getWindow()?.webContents.send("file:progress", progress);
+    }
+
+    return tcpClient.request(
+      MessageTypes.FILE_UPLOAD_END,
+      { transferId: start.transferId },
+      30000,
+    );
+  }
+
   ipcMain.handle("auth:register", async (_event, payload) => {
     await ensureConnected(payload);
     return tcpClient.request(MessageTypes.AUTH_REGISTER, payload);
@@ -92,6 +125,12 @@ function registerIpcHandlers({
   );
   ipcMain.handle("chat:send", (_event, payload) =>
     tcpClient.request(MessageTypes.CHAT_SEND, payload),
+  );
+  ipcMain.handle("chat:delete-message", (_event, payload) =>
+    tcpClient.request(MessageTypes.CHAT_DELETE, payload),
+  );
+  ipcMain.handle("chat:pin-message", (_event, payload) =>
+    tcpClient.request(MessageTypes.CHAT_PIN, payload),
   );
   ipcMain.handle("group:create", (_event, payload) =>
     tcpClient.request(MessageTypes.GROUP_CREATE, payload),
@@ -159,38 +198,27 @@ function registerIpcHandlers({
     const stats = fs.statSync(filePath);
     const originalName = path.basename(filePath);
     const mimeType = getMimeType(filePath);
-    const start = await tcpClient.request(MessageTypes.FILE_UPLOAD_START, {
-      ...payload,
+    const fileBuffer = fs.readFileSync(filePath);
+    if (stats.size !== fileBuffer.length) {
+      throw new Error("No se pudo leer el archivo completo");
+    }
+    return uploadBuffer(
+      payload,
+      fileBuffer,
       originalName,
       mimeType,
-      size: stats.size,
-    });
-    const fileBuffer = fs.readFileSync(filePath);
+    );
+  });
 
-    for (
-      let offset = 0;
-      offset < fileBuffer.length;
-      offset += config.fileChunkSize
-    ) {
-      const chunk = fileBuffer.subarray(
-        offset,
-        offset + config.fileChunkSize,
-      );
-      const progress = await tcpClient.request(
-        MessageTypes.FILE_UPLOAD_CHUNK,
-        {
-          transferId: start.transferId,
-          chunkBase64: chunk.toString("base64"),
-        },
-        30000,
-      );
-      getWindow()?.webContents.send("file:progress", progress);
-    }
+  ipcMain.handle("file:upload-recorded-audio", async (_event, payload) => {
+    const fileBuffer = Buffer.from(payload.dataBase64 || "", "base64");
+    if (!fileBuffer.length) throw new Error("La nota de voz está vacía");
 
-    return tcpClient.request(
-      MessageTypes.FILE_UPLOAD_END,
-      { transferId: start.transferId },
-      30000,
+    return uploadBuffer(
+      payload,
+      fileBuffer,
+      payload.originalName || `nota-voz-${Date.now()}.webm`,
+      payload.mimeType || "audio/webm",
     );
   });
 

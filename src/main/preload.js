@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld("chad", {
     getMessages: (payload) =>
       ipcRenderer.invoke("chat:get-messages", payload),
     send: (payload) => ipcRenderer.invoke("chat:send", payload),
+    deleteMessage: (payload) =>
+      ipcRenderer.invoke("chat:delete-message", payload),
+    pinMessage: (payload) => ipcRenderer.invoke("chat:pin-message", payload),
   },
   group: {
     create: (payload) => ipcRenderer.invoke("group:create", payload),
@@ -28,6 +31,8 @@ contextBridge.exposeInMainWorld("chad", {
   file: {
     chooseAndUpload: (payload) =>
       ipcRenderer.invoke("file:choose-and-upload", payload),
+    uploadRecordedAudio: (payload) =>
+      ipcRenderer.invoke("file:upload-recorded-audio", payload),
     list: (payload) => ipcRenderer.invoke("file:list", payload),
     download: (payload) => ipcRenderer.invoke("file:download", payload),
     onProgress: (callback) => on("file:progress", callback),

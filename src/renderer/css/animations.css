@@ -55,12 +55,26 @@
   }
 }
 
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .message-row {
   animation: message-enter 180ms ease both;
 }
 
 .incoming-call:not(.hidden) {
   animation: slide-left 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.active-call-indicator:not(.hidden) {
+  animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .modal:not(.hidden),

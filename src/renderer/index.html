@@ -255,6 +255,7 @@
             </div>
           </header>
 
+          <div id="pinned-messages" class="pinned-messages hidden"></div>
           <div id="messages-container" class="messages-container"></div>
 
           <div id="upload-progress" class="upload-progress hidden">
@@ -263,6 +264,25 @@
           </div>
 
           <footer class="composer">
+            <div id="composer-context" class="composer-context hidden">
+              <div>
+                <strong id="composer-context-title">Respondiendo</strong>
+                <span id="composer-context-text"></span>
+              </div>
+              <button
+                id="cancel-composer-context"
+                class="composer-context-close"
+                type="button"
+                title="Cancelar respuesta"
+              >
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+            <div id="voice-recording-status" class="voice-recording-status hidden">
+              <span class="recording-dot"></span>
+              <strong>Grabando nota de voz</strong>
+              <time id="voice-recording-time">00:00</time>
+            </div>
             <button id="attach-button" class="icon-button" title="Adjuntar archivo">
               <i data-lucide="paperclip"></i>
             </button>
@@ -272,6 +292,14 @@
               maxlength="4000"
               placeholder="Escribe un mensaje"
             ></textarea>
+            <button
+              id="voice-record-button"
+              class="icon-button"
+              type="button"
+              title="Grabar nota de voz"
+            >
+              <i data-lucide="mic"></i>
+            </button>
             <button id="send-message-button" class="send-button" title="Enviar">
               <i data-lucide="send"></i>
             </button>
@@ -306,8 +334,40 @@
       </div>
     </aside>
 
+    <aside id="active-call-indicator" class="active-call-indicator hidden">
+      <button id="open-active-call" class="active-call-open" type="button">
+        <span id="active-call-icon" class="active-call-icon">
+          <i data-lucide="phone"></i>
+        </span>
+        <span class="active-call-copy">
+          <strong id="active-call-name">Llamada activa</strong>
+          <span>
+            <span id="active-call-status">En curso</span>
+            <time id="active-call-duration">00:00</time>
+          </span>
+        </span>
+        <i data-lucide="maximize-2"></i>
+      </button>
+      <button
+        id="quick-end-call"
+        class="active-call-end"
+        type="button"
+        title="Finalizar llamada"
+      >
+        <i data-lucide="phone-off"></i>
+      </button>
+    </aside>
+
     <section id="call-overlay" class="call-overlay hidden">
       <div class="call-stage">
+        <button
+          id="minimize-call-button"
+          class="call-minimize"
+          type="button"
+          title="Minimizar llamada"
+        >
+          <i data-lucide="minimize-2"></i>
+        </button>
         <video id="remote-video" class="remote-video" autoplay playsinline></video>
         <img
           id="remote-frame"

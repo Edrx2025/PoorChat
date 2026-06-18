@@ -11,12 +11,15 @@ programación orientada a objetos y patrones de diseño.
 - Chats privados persistentes.
 - Creación y actualización de grupos.
 - Mensajes de texto en tiempo real mediante TCP.
+- Respuestas, mensajes fijados y borrado lógico sincronizados.
+- Notas de voz grabadas desde el compositor.
 - Archivos por chunks mediante TCP.
 - Imágenes, documentos, audio y video.
 - Historial de mensajes y archivos en SQLite.
 - Llamadas de audio y video con señalización TCP.
-- Audio y frames de video fragmentados y retransmitidos mediante UDP.
+- Audio PCM de baja latencia y frames de video retransmitidos mediante UDP.
 - Notificación flotante de llamada entrante.
+- Indicador persistente de llamada con vista completa opcional.
 - Historial de llamadas.
 - Foto de perfil.
 - Cambio de username, nombre, contraseña y estado.
@@ -264,15 +267,21 @@ Los archivos se envían por TCP en este orden:
 El servidor reconstruye el archivo, lo guarda en `storage/uploads` y registra
 sus metadatos en SQLite.
 
+Las notas de voz se graban con `MediaRecorder` en Electron y reutilizan este
+mismo flujo TCP, por lo que quedan disponibles en el historial como mensajes de
+audio.
+
 ## Llamadas y videollamadas
 
 La solicitud, aceptación, rechazo y finalización viajan por TCP. Al aceptar:
 
-- El micrófono se captura con `MediaRecorder`.
+- El micrófono se procesa con Web Audio y se convierte a PCM mono de 16 kHz.
 - La cámara se reduce a `320x240`.
 - El video se comprime como JPEG.
 - Audio y video se fragmentan en datagramas UDP.
 - El servidor UDP retransmite los paquetes a los participantes.
+- La llamada permanece en un indicador no bloqueante hasta que el usuario abre
+  voluntariamente la vista completa.
 
 La calidad está limitada intencionalmente para mantener un alcance académico.
 

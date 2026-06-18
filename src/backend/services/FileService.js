@@ -22,9 +22,17 @@ class FileService {
       originalName,
       mimeType = "application/octet-stream",
       size,
+      replyToId = null,
     } = payload;
 
     this.chatService.assertContextAccess(userId, contextType, contextId);
+    const reply = replyToId
+      ? this.chatService.assertReplyTarget(
+          contextType,
+          contextId,
+          Number(replyToId),
+        )
+      : null;
 
     const fileSize = Number(size);
     if (!Number.isFinite(fileSize) || fileSize <= 0) {
@@ -42,6 +50,7 @@ class FileService {
       originalName,
       mimeType,
       expectedSize: fileSize,
+      replyToId: reply?.id || null,
       chunks: [],
       receivedSize: 0,
     });
@@ -110,6 +119,7 @@ class FileService {
       transfer.contextType,
       transfer.contextId,
       file,
+      transfer.replyToId,
     );
 
     return { file, message };

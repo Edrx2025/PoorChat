@@ -18,15 +18,28 @@ export class CallController {
     this.mediaCallId = null;
     this.mediaStartPromise = null;
     this.mediaSessionVersion = 0;
-    this.mediaRecorder = null;
+    this.audioContext = null;
+    this.audioSourceNode = null;
+    this.audioProcessorNode = null;
+    this.audioSilenceGain = null;
+    this.remoteAudioNextTime = 0;
+    this.lastAudioSequence = 0;
     this.videoInterval = null;
     this.durationInterval = null;
     this.startedAt = null;
     this.remoteAudioPlayers = new Set();
+    this.overlayOpen = false;
 
     $("#accept-call-button").addEventListener("click", () => this.acceptIncoming());
     $("#reject-call-button").addEventListener("click", () => this.rejectIncoming());
     $("#end-call-button").addEventListener("click", () => this.endActive());
+    $("#quick-end-call").addEventListener("click", () => this.endActive());
+    $("#open-active-call").addEventListener("click", () =>
+      this.openCallOverlay(),
+    );
+    $("#minimize-call-button").addEventListener("click", () =>
+      this.minimizeCallOverlay(),
+    );
     $("#toggle-microphone").addEventListener("click", () => this.toggleTrack("audio"));
     $("#toggle-camera").addEventListener("click", () => this.toggleTrack("video"));
 
@@ -52,7 +65,8 @@ export class CallController {
 
       const call = await api.startCall(payload);
       state.activeCall = call;
-      this.showCallOverlay(call, "Llamando");
+      this.updateCallUI(call, "Llamando");
+      this.showCallIndicator();
     } catch (error) {
       showToast(error.message, "error");
     }
@@ -80,7 +94,9 @@ export class CallController {
       $("#incoming-call").classList.add("hidden");
       this.incomingCall = null;
       state.activeCall = call;
-      await this.showCallOverlay(call, "En curso");
+      this.updateCallUI(call, "En curso");
+      this.showCallIndicator();
+      await this.ensureMediaStarted(call);
       this.onCallsChanged();
     } catch (error) {
       showToast(error.message, "error");
@@ -114,7 +130,17 @@ export class CallController {
 
     if (call.status === "in_progress") {
       state.activeCall = call;
-      await this.showCallOverlay(call, "En curso");
+      this.updateCallUI(call, "En curso");
+      this.showCallIndicator();
+      if (this.incomingCall?.id === call.id) {
+        this.incomingCall = null;
+        $("#incoming-call").classList.add("hidden");
+      }
+      await this.ensureMediaStarted(call);
+    } else if (call.status === "started" && call.callerId === state.currentUser.id) {
+      state.activeCall = call;
+      this.updateCallUI(call, "Llamando");
+      this.showCallIndicator();
     } else if (["ended", "rejected", "missed"].includes(call.status)) {
       if (state.activeCall?.id === call.id) this.closeCallOverlay();
       if (this.incomingCall?.id === call.id) {
@@ -126,8 +152,7 @@ export class CallController {
     this.onCallsChanged();
   }
 
-  async showCallOverlay(call, status) {
-    const overlay = $("#call-overlay");
+  updateCallUI(call, status) {
     const isVideo = call.callType === "video";
     const otherName =
       call.groupName ||
@@ -144,16 +169,35 @@ export class CallController {
 
     $("#call-status").textContent = status;
     $("#call-name").textContent = otherName || "Llamada de grupo";
+    $("#active-call-name").textContent = otherName || "Llamada de grupo";
+    $("#active-call-status").textContent = status;
+    $("#active-call-icon").innerHTML =
+      `<i data-lucide="${isVideo ? "video" : "phone"}"></i>`;
     setAvatar($("#call-avatar"), otherAvatar);
     $("#audio-call-visual").classList.toggle("hidden", isVideo);
     $("#remote-frame").classList.toggle("hidden", !isVideo);
     $("#local-video").classList.toggle("hidden", !isVideo);
     $("#toggle-camera").classList.toggle("hidden", !isVideo);
-    overlay.classList.remove("hidden");
+    renderIcons();
+  }
 
-    if (call.status === "in_progress") {
-      await this.ensureMediaStarted(call);
-    }
+  showCallIndicator() {
+    $("#active-call-indicator").classList.remove("hidden");
+  }
+
+  openCallOverlay() {
+    if (!state.activeCall) return;
+    this.overlayOpen = true;
+    this.updateCallUI(
+      state.activeCall,
+      state.activeCall.status === "in_progress" ? "En curso" : "Llamando",
+    );
+    $("#call-overlay").classList.remove("hidden");
+  }
+
+  minimizeCallOverlay() {
+    this.overlayOpen = false;
+    $("#call-overlay").classList.add("hidden");
   }
 
   async ensureMediaStarted(call) {
@@ -185,7 +229,12 @@ export class CallController {
 
     try {
       acquiredStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
         video: call.callType === "video",
       });
 
@@ -202,7 +251,7 @@ export class CallController {
       this.stream = acquiredStream;
       $("#local-video").srcObject = acquiredStream;
 
-      this.startAudioTransmission(call.id);
+      await this.startAudioTransmission(call.id);
       if (call.callType === "video") this.startVideoTransmission(call.id);
 
       this.startedAt = Date.now();
@@ -211,10 +260,12 @@ export class CallController {
         const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
         const remaining = String(seconds % 60).padStart(2, "0");
         $("#call-duration").textContent = `${minutes}:${remaining}`;
+        $("#active-call-duration").textContent = `${minutes}:${remaining}`;
       }, 1000);
     } catch (error) {
-      if (acquiredStream) this.stopStream(acquiredStream);
       if (sessionVersion !== this.mediaSessionVersion) return;
+      if (acquiredStream) this.stopStream(acquiredStream);
+      this.releaseMedia();
 
       showToast(
         `No se pudo acceder a cámara o micrófono: ${error.message}`,
@@ -223,20 +274,46 @@ export class CallController {
     }
   }
 
-  startAudioTransmission(callId) {
-    if (!window.MediaRecorder || !this.stream) return;
-
+  async startAudioTransmission(callId) {
+    if (!this.stream) return;
     const audioTracks = this.stream.getAudioTracks();
     if (!audioTracks.length) return;
 
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      throw new Error("Web Audio no está disponible");
+    }
+
     const audioStream = new MediaStream(audioTracks);
-    this.mediaRecorder = new MediaRecorder(audioStream);
-    this.mediaRecorder.addEventListener("dataavailable", async (event) => {
-      if (!event.data.size || !state.activeCall) return;
-      const dataBase64 = await blobToBase64(event.data);
-      api.sendMedia({ callId, mediaType: "audio", dataBase64 }).catch(() => {});
-    });
-    this.mediaRecorder.start(350);
+    this.audioContext = new AudioContextClass({ latencyHint: "interactive" });
+    await this.audioContext.resume();
+    this.audioSourceNode =
+      this.audioContext.createMediaStreamSource(audioStream);
+    this.audioProcessorNode = this.audioContext.createScriptProcessor(2048, 1, 1);
+    this.audioSilenceGain = this.audioContext.createGain();
+    this.audioSilenceGain.gain.value = 0;
+
+    this.audioProcessorNode.onaudioprocess = (event) => {
+      if (!state.activeCall || state.activeCall.id !== callId) return;
+      const input = event.inputBuffer.getChannelData(0);
+      const samples = downsampleAudio(
+        input,
+        this.audioContext.sampleRate,
+        16000,
+      );
+      api.sendMedia({
+        callId,
+        mediaType: "audio",
+        encoding: "pcm_s16le",
+        sampleRate: 16000,
+        channels: 1,
+        dataBase64: int16ToBase64(samples),
+      }).catch(() => {});
+    };
+
+    this.audioSourceNode.connect(this.audioProcessorNode);
+    this.audioProcessorNode.connect(this.audioSilenceGain);
+    this.audioSilenceGain.connect(this.audioContext.destination);
   }
 
   startVideoTransmission(callId) {
@@ -267,6 +344,11 @@ export class CallController {
     }
 
     if (media.mediaType === "audio") {
+      if (media.encoding === "pcm_s16le") {
+        this.playPcmAudio(media);
+        return;
+      }
+
       const bytes = Uint8Array.from(atob(media.dataBase64), (char) =>
         char.charCodeAt(0),
       );
@@ -280,6 +362,36 @@ export class CallController {
         URL.revokeObjectURL(url);
       };
     }
+  }
+
+  playPcmAudio(media) {
+    if (!this.audioContext || Number(media.sequence) <= this.lastAudioSequence) {
+      return;
+    }
+    this.lastAudioSequence = Number(media.sequence);
+    this.audioContext.resume().catch(() => {});
+
+    const bytes = base64ToBytes(media.dataBase64);
+    const samples = new Int16Array(bytes.buffer);
+    const sampleRate = Number(media.sampleRate) || 16000;
+    const buffer = this.audioContext.createBuffer(1, samples.length, sampleRate);
+    const channel = buffer.getChannelData(0);
+    for (let index = 0; index < samples.length; index += 1) {
+      channel[index] = samples[index] / 32768;
+    }
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.audioContext.destination);
+    const now = this.audioContext.currentTime;
+    if (
+      this.remoteAudioNextTime < now ||
+      this.remoteAudioNextTime > now + 0.45
+    ) {
+      this.remoteAudioNextTime = now + 0.06;
+    }
+    source.start(this.remoteAudioNextTime);
+    this.remoteAudioNextTime += buffer.duration;
   }
 
   async endActive() {
@@ -312,7 +424,10 @@ export class CallController {
     $("#local-video").srcObject = null;
     $("#remote-frame").src = "";
     $("#call-duration").textContent = "00:00";
+    $("#active-call-duration").textContent = "00:00";
+    $("#active-call-indicator").classList.add("hidden");
     $("#call-overlay").classList.add("hidden");
+    this.overlayOpen = false;
   }
 
   releaseMedia() {
@@ -320,15 +435,25 @@ export class CallController {
     this.mediaCallId = null;
     this.mediaStartPromise = null;
 
-    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
-      this.mediaRecorder.stop();
-    }
     if (this.videoInterval) clearInterval(this.videoInterval);
     if (this.durationInterval) clearInterval(this.durationInterval);
 
+    if (this.audioProcessorNode) {
+      this.audioProcessorNode.onaudioprocess = null;
+      this.audioProcessorNode.disconnect();
+    }
+    this.audioSourceNode?.disconnect();
+    this.audioSilenceGain?.disconnect();
+    this.audioContext?.close().catch(() => {});
+
     this.stopStream(this.stream);
     this.stream = null;
-    this.mediaRecorder = null;
+    this.audioContext = null;
+    this.audioSourceNode = null;
+    this.audioProcessorNode = null;
+    this.audioSilenceGain = null;
+    this.remoteAudioNextTime = 0;
+    this.lastAudioSequence = 0;
     this.videoInterval = null;
     this.durationInterval = null;
     this.startedAt = null;
@@ -400,11 +525,47 @@ function callHistoryMarkup(call) {
   `;
 }
 
-async function blobToBase64(blob) {
-  const buffer = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
+function downsampleAudio(input, inputRate, outputRate) {
+  if (inputRate === outputRate) {
+    return floatToInt16(input);
+  }
 
+  const ratio = inputRate / outputRate;
+  const outputLength = Math.floor(input.length / ratio);
+  const output = new Int16Array(outputLength);
+
+  for (let outputIndex = 0; outputIndex < outputLength; outputIndex += 1) {
+    const start = Math.floor(outputIndex * ratio);
+    const end = Math.min(Math.floor((outputIndex + 1) * ratio), input.length);
+    let sum = 0;
+    for (let inputIndex = start; inputIndex < end; inputIndex += 1) {
+      sum += input[inputIndex];
+    }
+    const sample = sum / Math.max(1, end - start);
+    output[outputIndex] = Math.max(-32768, Math.min(32767, sample * 32767));
+  }
+
+  return output;
+}
+
+function floatToInt16(input) {
+  const output = new Int16Array(input.length);
+  for (let index = 0; index < input.length; index += 1) {
+    output[index] = Math.max(
+      -32768,
+      Math.min(32767, input[index] * 32767),
+    );
+  }
+  return output;
+}
+
+function int16ToBase64(samples) {
+  const bytes = new Uint8Array(samples.buffer);
+  let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+function base64ToBytes(dataBase64) {
+  return Uint8Array.from(atob(dataBase64), (char) => char.charCodeAt(0));
 }

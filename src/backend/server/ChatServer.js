@@ -101,6 +101,7 @@ class ChatServer {
   bindObservers() {
     const routedEvents = [
       "message:new",
+      "message:updated",
       "group:created",
       "group:updated",
       "call:incoming",
@@ -156,6 +157,14 @@ class ChatServer {
         return this.chatService.getMessages(user.id, payload);
       case MessageTypes.CHAT_SEND:
         return this.chatService.sendText(user.id, payload);
+      case MessageTypes.CHAT_DELETE:
+        return this.chatService.deleteMessage(user.id, Number(payload.messageId));
+      case MessageTypes.CHAT_PIN:
+        return this.chatService.setMessagePinned(
+          user.id,
+          Number(payload.messageId),
+          payload.pinned,
+        );
       case MessageTypes.GROUP_CREATE:
         return this.groupService.create(user.id, payload);
       case MessageTypes.GROUP_UPDATE:

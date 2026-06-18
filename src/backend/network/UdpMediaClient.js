@@ -12,6 +12,7 @@ class UdpMediaClient extends EventEmitter {
     this.serverPort = null;
     this.userId = null;
     this.frames = new Map();
+    this.sequences = new Map();
   }
 
   start({ serverHost, serverPort, userId }) {
@@ -35,12 +36,22 @@ class UdpMediaClient extends EventEmitter {
     });
   }
 
-  sendMedia({ callId, mediaType, dataBase64 }) {
+  sendMedia({
+    callId,
+    mediaType,
+    dataBase64,
+    encoding = null,
+    sampleRate = null,
+    channels = null,
+  }) {
     if (!this.socket) throw new Error("El canal UDP no está activo");
 
     const buffer = Buffer.from(dataBase64, "base64");
     const frameId = crypto.randomUUID();
     const totalChunks = Math.ceil(buffer.length / this.config.mediaChunkSize);
+    const sequenceKey = `${callId}:${mediaType}`;
+    const sequence = (this.sequences.get(sequenceKey) || 0) + 1;
+    this.sequences.set(sequenceKey, sequence);
 
     for (let index = 0; index < totalChunks; index += 1) {
       const start = index * this.config.mediaChunkSize;
@@ -52,8 +63,11 @@ class UdpMediaClient extends EventEmitter {
         callId,
         senderId: this.userId,
         mediaType,
+        encoding,
+        sampleRate,
+        channels,
         frameId,
-        sequence: index,
+        sequence,
         chunkIndex: index,
         totalChunks,
         timestamp: Date.now(),
@@ -98,6 +112,10 @@ class UdpMediaClient extends EventEmitter {
         callId: packet.callId,
         senderId: packet.senderId,
         mediaType: packet.mediaType,
+        encoding: packet.encoding,
+        sampleRate: packet.sampleRate,
+        channels: packet.channels,
+        sequence: packet.sequence,
         dataBase64: data,
         timestamp: packet.timestamp,
       });
@@ -113,6 +131,7 @@ class UdpMediaClient extends EventEmitter {
     if (this.socket) this.socket.close();
     this.socket = null;
     this.frames.clear();
+    this.sequences.clear();
   }
 }
 

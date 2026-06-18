@@ -108,7 +108,22 @@ export function applyTheme(theme, accentColor) {
   document.documentElement.dataset.theme = theme || "dark";
   if (accentColor) {
     document.documentElement.style.setProperty("--accent", accentColor);
+    document.documentElement.style.setProperty(
+      "--accent-contrast",
+      getContrastColor(accentColor),
+    );
   }
+}
+
+function getContrastColor(color) {
+  const clean = String(color).replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(clean)) return "#17200f";
+
+  const red = parseInt(clean.slice(0, 2), 16);
+  const green = parseInt(clean.slice(2, 4), 16);
+  const blue = parseInt(clean.slice(4, 6), 16);
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+  return luminance > 145 ? "#17200f" : "#ffffff";
 }
 
 export function setButtonLoading(button, loading, text = null) {

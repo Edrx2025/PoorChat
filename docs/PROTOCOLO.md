@@ -50,6 +50,8 @@ Evento:
 - `chat:open`
 - `chat:get-messages`
 - `chat:send`
+- `chat:delete-message`
+- `chat:pin-message`
 - `group:create`
 - `group:update`
 - `file:upload-start`
@@ -69,6 +71,7 @@ Evento:
 ## Eventos TCP
 
 - `message:new`
+- `message:updated`
 - `group:created`
 - `group:updated`
 - `call:incoming`
@@ -95,9 +98,12 @@ Chunk de media:
   "kind": "media",
   "callId": 10,
   "senderId": 1,
-  "mediaType": "video",
+  "mediaType": "audio",
+  "encoding": "pcm_s16le",
+  "sampleRate": 16000,
+  "channels": 1,
   "frameId": "uuid",
-  "sequence": 0,
+  "sequence": 12,
   "chunkIndex": 0,
   "totalChunks": 4,
   "timestamp": 1781700000000,

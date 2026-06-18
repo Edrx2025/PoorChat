@@ -7,6 +7,7 @@ class Message {
     content = "",
     messageType = "text",
     fileId = null,
+    replyToId = null,
     createdAt = null,
   }) {
     this.id = id;
@@ -16,6 +17,7 @@ class Message {
     this.content = content;
     this.messageType = messageType;
     this.fileId = fileId;
+    this.replyToId = replyToId;
     this.createdAt = createdAt;
   }
 }

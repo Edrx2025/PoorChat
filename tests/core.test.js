@@ -169,6 +169,45 @@ test("chat privado y persistencia de mensajes", () => {
   assert.ok(history.some((item) => item.id === message.id));
 });
 
+test("respuestas, mensajes fijados y borrado lógico", () => {
+  const user1 = userRepository.findByUsername("user1");
+  const tester = userRepository.findByUsername("tester_updated");
+  const chat = chatService.openPrivateChat(user1.id, tester.id);
+  const original = chatService.sendText(user1.id, {
+    contextType: "private",
+    contextId: chat.id,
+    content: "Mensaje para responder",
+  });
+  const reply = chatService.sendText(tester.id, {
+    contextType: "private",
+    contextId: chat.id,
+    content: "Esta es una respuesta",
+    replyToId: original.id,
+  });
+
+  assert.equal(reply.reply.id, original.id);
+  assert.equal(reply.reply.content, original.content);
+
+  const pinned = chatService.setMessagePinned(tester.id, original.id, true);
+  assert.equal(pinned.isPinned, true);
+
+  assert.throws(
+    () => chatService.deleteMessage(tester.id, original.id),
+    /propios mensajes/,
+  );
+  const deleted = chatService.deleteMessage(user1.id, original.id);
+  assert.equal(deleted.deleted, true);
+  assert.equal(deleted.isPinned, false);
+  assert.equal(deleted.content, "");
+
+  const history = chatService.getMessages(tester.id, {
+    contextType: "private",
+    contextId: chat.id,
+  });
+  const persistedReply = history.find((message) => message.id === reply.id);
+  assert.equal(persistedReply.reply.deleted, true);
+});
+
 test("creación de grupo y mensaje grupal", () => {
   const user1 = userRepository.findByUsername("user1");
   const tester = userRepository.findByUsername("tester_updated");
@@ -217,6 +256,37 @@ test("transferencia de archivo por chunks", () => {
     content.toString(),
   );
   assert.equal(result.message.messageType, "document");
+});
+
+test("nota de voz se guarda como mensaje de audio", () => {
+  const user1 = userRepository.findByUsername("user1");
+  const user2 = userRepository.findByUsername("user2");
+  const chat = chatService.openPrivateChat(user1.id, user2.id);
+  const original = chatService.sendText(user2.id, {
+    contextType: "private",
+    contextId: chat.id,
+    content: "Envía una nota de voz",
+  });
+  const content = Buffer.from("audio-opus-simulado");
+  const transfer = fileService.beginUpload(user1.id, {
+    contextType: "private",
+    contextId: chat.id,
+    originalName: "nota-voz.webm",
+    mimeType: "audio/webm;codecs=opus",
+    size: content.length,
+    replyToId: original.id,
+  });
+
+  fileService.appendChunk(user1.id, {
+    transferId: transfer.transferId,
+    chunkBase64: content.toString("base64"),
+  });
+  const result = fileService.finishUpload(user1.id, transfer);
+
+  assert.equal(result.file.fileType, "audio");
+  assert.equal(result.message.messageType, "audio");
+  assert.equal(result.message.reply.id, original.id);
+  assert.match(result.message.file.previewData, /^data:audio\/webm/);
 });
 
 test("llamadas aceptadas y rechazadas quedan registradas", () => {
@@ -331,6 +401,9 @@ test("servidor TCP responde a login y bootstrap", async () => {
   udpOne.sendMedia({
     callId: outgoingCall.id,
     mediaType: "audio",
+    encoding: "pcm_s16le",
+    sampleRate: 16000,
+    channels: 1,
     dataBase64: mediaContent,
   });
   const media = await mediaPromise;
@@ -338,6 +411,9 @@ test("servidor TCP responde a login y bootstrap", async () => {
     Buffer.from(media.dataBase64, "base64").toString(),
     "audio-media-packet",
   );
+  assert.equal(media.encoding, "pcm_s16le");
+  assert.equal(media.sampleRate, 16000);
+  assert.equal(media.sequence, 1);
 
   await clientOne.request(MessageTypes.CALL_END, {
     callId: outgoingCall.id,

@@ -21,6 +21,39 @@ class DatabaseConnection {
     );
     const sql = fs.readFileSync(migrationPath, "utf8");
     this.connection.exec(sql);
+    this.ensureMessageColumns();
+    this.connection.exec(`
+      CREATE INDEX IF NOT EXISTS idx_messages_reply ON messages(reply_to_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_pinned_chat ON messages(chat_id, is_pinned);
+      CREATE INDEX IF NOT EXISTS idx_messages_pinned_group ON messages(group_id, is_pinned);
+      UPDATE settings
+      SET accent_color = '#c7db94'
+      WHERE accent_color IN ('#2f8f73', '#43b993');
+    `);
+  }
+
+  ensureMessageColumns() {
+    const columns = new Set(
+      this.connection
+        .prepare("PRAGMA table_info(messages)")
+        .all()
+        .map((column) => column.name),
+    );
+    const additions = [
+      ["reply_to_id", "INTEGER REFERENCES messages(id) ON DELETE SET NULL"],
+      ["is_pinned", "INTEGER NOT NULL DEFAULT 0"],
+      ["pinned_by", "INTEGER REFERENCES users(id) ON DELETE SET NULL"],
+      ["pinned_at", "TEXT"],
+      ["deleted_at", "TEXT"],
+    ];
+
+    for (const [name, definition] of additions) {
+      if (!columns.has(name)) {
+        this.connection.exec(
+          `ALTER TABLE messages ADD COLUMN ${name} ${definition};`,
+        );
+      }
+    }
   }
 
   prepare(sql) {

@@ -30,8 +30,10 @@ function publicUser(user) {
 function presentMessage(message) {
   if (!message) return null;
 
+  const deleted = Boolean(message.deletedAt);
   let filePreviewData = null;
   if (
+    !deleted &&
     message.filePath &&
     message.fileSize <= 8 * 1024 * 1024 &&
     ["image", "audio", "video"].includes(message.fileType) &&
@@ -45,13 +47,16 @@ function presentMessage(message) {
 
   return {
     ...message,
+    content: deleted ? "" : message.content,
+    isPinned: Boolean(message.isPinned),
+    deleted,
     senderAvatarData: message.senderProfilePicture
       ? fileToDataUrl(
           message.senderProfilePicture,
           mimeFromFilePath(message.senderProfilePicture),
         )
       : null,
-    file: message.fileId
+    file: !deleted && message.fileId
       ? {
           id: message.fileId,
           originalName: message.fileOriginalName,
@@ -59,6 +64,17 @@ function presentMessage(message) {
           mimeType: message.fileMimeType,
           size: message.fileSize,
           previewData: filePreviewData,
+        }
+      : null,
+    reply: message.replyToId
+      ? {
+          id: message.replyToId,
+          senderDisplayName: message.replySenderDisplayName,
+          content: message.replyDeletedAt
+            ? "Mensaje borrado"
+            : message.replyContent,
+          messageType: message.replyMessageType,
+          deleted: Boolean(message.replyDeletedAt),
         }
       : null,
   };

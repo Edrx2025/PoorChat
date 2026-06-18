@@ -6,12 +6,18 @@ export const api = {
   openChat: (targetUserId) => window.chad.chat.open({ targetUserId }),
   getMessages: (contextType, contextId) =>
     window.chad.chat.getMessages({ contextType, contextId }),
-  sendMessage: (contextType, contextId, content) =>
-    window.chad.chat.send({ contextType, contextId, content }),
+  sendMessage: (contextType, contextId, content, replyToId = null) =>
+    window.chad.chat.send({ contextType, contextId, content, replyToId }),
+  deleteMessage: (messageId) =>
+    window.chad.chat.deleteMessage({ messageId }),
+  pinMessage: (messageId, pinned) =>
+    window.chad.chat.pinMessage({ messageId, pinned }),
   createGroup: (payload) => window.chad.group.create(payload),
   updateGroup: (payload) => window.chad.group.update(payload),
-  uploadFile: (contextType, contextId) =>
-    window.chad.file.chooseAndUpload({ contextType, contextId }),
+  uploadFile: (contextType, contextId, replyToId = null) =>
+    window.chad.file.chooseAndUpload({ contextType, contextId, replyToId }),
+  uploadRecordedAudio: (payload) =>
+    window.chad.file.uploadRecordedAudio(payload),
   downloadFile: (fileId) => window.chad.file.download({ fileId }),
   startCall: (payload) => window.chad.call.start(payload),
   acceptCall: (callId) => window.chad.call.accept({ callId }),

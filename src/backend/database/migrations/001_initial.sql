@@ -71,11 +71,18 @@ CREATE TABLE IF NOT EXISTS messages (
   content TEXT NOT NULL DEFAULT '',
   message_type TEXT NOT NULL DEFAULT 'text',
   file_id INTEGER,
+  reply_to_id INTEGER,
+  is_pinned INTEGER NOT NULL DEFAULT 0,
+  pinned_by INTEGER,
+  pinned_at TEXT,
+  deleted_at TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(chat_id) REFERENCES private_chats(id) ON DELETE CASCADE,
   FOREIGN KEY(group_id) REFERENCES "groups"(id) ON DELETE CASCADE,
   FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE SET NULL,
+  FOREIGN KEY(reply_to_id) REFERENCES messages(id) ON DELETE SET NULL,
+  FOREIGN KEY(pinned_by) REFERENCES users(id) ON DELETE SET NULL,
   CHECK((chat_id IS NOT NULL AND group_id IS NULL) OR (chat_id IS NULL AND group_id IS NOT NULL))
 );
 
@@ -102,7 +109,7 @@ CREATE TABLE IF NOT EXISTS settings (
   notifications_enabled INTEGER NOT NULL DEFAULT 1,
   call_notifications_enabled INTEGER NOT NULL DEFAULT 1,
   sound_enabled INTEGER NOT NULL DEFAULT 1,
-  accent_color TEXT NOT NULL DEFAULT '#2f8f73',
+  accent_color TEXT NOT NULL DEFAULT '#c7db94',
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );

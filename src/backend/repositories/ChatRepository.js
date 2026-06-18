@@ -65,7 +65,10 @@ class ChatRepository extends BaseRepository {
         peer.profile_picture AS peerProfilePicture,
         peer.status AS peerStatus,
         (
-          SELECT m.content
+          SELECT CASE
+            WHEN m.deleted_at IS NOT NULL THEN 'Mensaje borrado'
+            ELSE m.content
+          END
           FROM messages m
           WHERE m.chat_id = pc.id
           ORDER BY m.id DESC
@@ -103,6 +106,7 @@ class ChatRepository extends BaseRepository {
     content,
     messageType,
     fileId = null,
+    replyToId = null,
   }) {
     const result = this.prepare(`
       INSERT INTO messages (
@@ -111,10 +115,19 @@ class ChatRepository extends BaseRepository {
         sender_id,
         content,
         message_type,
-        file_id
+        file_id,
+        reply_to_id
       )
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(chatId, groupId, senderId, content, messageType, fileId);
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      chatId,
+      groupId,
+      senderId,
+      content,
+      messageType,
+      fileId,
+      replyToId,
+    );
 
     return this.findMessageById(Number(result.lastInsertRowid));
   }
@@ -129,6 +142,11 @@ class ChatRepository extends BaseRepository {
         m.content,
         m.message_type AS messageType,
         m.file_id AS fileId,
+        m.reply_to_id AS replyToId,
+        m.is_pinned AS isPinned,
+        m.pinned_by AS pinnedBy,
+        m.pinned_at AS pinnedAt,
+        m.deleted_at AS deletedAt,
         m.created_at AS createdAt,
         u.username AS senderUsername,
         u.display_name AS senderDisplayName,
@@ -137,10 +155,16 @@ class ChatRepository extends BaseRepository {
         f.file_path AS filePath,
         f.file_type AS fileType,
         f.mime_type AS fileMimeType,
-        f.size AS fileSize
+        f.size AS fileSize,
+        replied.content AS replyContent,
+        replied.message_type AS replyMessageType,
+        replied.deleted_at AS replyDeletedAt,
+        reply_user.display_name AS replySenderDisplayName
       FROM messages m
       JOIN users u ON u.id = m.sender_id
       LEFT JOIN files f ON f.id = m.file_id
+      LEFT JOIN messages replied ON replied.id = m.reply_to_id
+      LEFT JOIN users reply_user ON reply_user.id = replied.sender_id
       WHERE m.id = ?
     `).get(messageId);
   }
@@ -160,6 +184,11 @@ class ChatRepository extends BaseRepository {
           m.content,
           m.message_type AS messageType,
           m.file_id AS fileId,
+          m.reply_to_id AS replyToId,
+          m.is_pinned AS isPinned,
+          m.pinned_by AS pinnedBy,
+          m.pinned_at AS pinnedAt,
+          m.deleted_at AS deletedAt,
           m.created_at AS createdAt,
           u.username AS senderUsername,
           u.display_name AS senderDisplayName,
@@ -168,16 +197,52 @@ class ChatRepository extends BaseRepository {
           f.file_path AS filePath,
           f.file_type AS fileType,
           f.mime_type AS fileMimeType,
-          f.size AS fileSize
+          f.size AS fileSize,
+          replied.content AS replyContent,
+          replied.message_type AS replyMessageType,
+          replied.deleted_at AS replyDeletedAt,
+          reply_user.display_name AS replySenderDisplayName
         FROM messages m
         JOIN users u ON u.id = m.sender_id
         LEFT JOIN files f ON f.id = m.file_id
+        LEFT JOIN messages replied ON replied.id = m.reply_to_id
+        LEFT JOIN users reply_user ON reply_user.id = replied.sender_id
         WHERE ${contextColumn} = ?
         ORDER BY m.id DESC
         LIMIT ?
       )
       ORDER BY id ASC
     `).all(contextId, limit);
+  }
+
+  softDeleteMessage(messageId) {
+    this.prepare(`
+      UPDATE messages
+      SET
+        content = '',
+        message_type = 'deleted',
+        file_id = NULL,
+        is_pinned = 0,
+        pinned_by = NULL,
+        pinned_at = NULL,
+        deleted_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(messageId);
+
+    return this.findMessageById(messageId);
+  }
+
+  setMessagePinned(messageId, pinned, userId) {
+    this.prepare(`
+      UPDATE messages
+      SET
+        is_pinned = ?,
+        pinned_by = ?,
+        pinned_at = ${pinned ? "CURRENT_TIMESTAMP" : "NULL"}
+      WHERE id = ?
+    `).run(pinned ? 1 : 0, pinned ? userId : null, messageId);
+
+    return this.findMessageById(messageId);
   }
 }
 

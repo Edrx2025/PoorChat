@@ -5,7 +5,7 @@ class Settings {
     notificationsEnabled = true,
     callNotificationsEnabled = true,
     soundEnabled = true,
-    accentColor = "#2f8f73",
+    accentColor = "#c7db94",
   }) {
     this.userId = userId;
     this.theme = theme;

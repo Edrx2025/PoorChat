@@ -14,11 +14,15 @@ import {
 import { setupAuth } from "./auth.js";
 import {
   appendMessage,
+  cancelReply,
+  cancelVoiceRecording,
   openConversation,
   renderConversationList,
   renderDetails,
   sendCurrentMessage,
+  toggleVoiceRecording,
   uploadCurrentFile,
+  updateMessage,
 } from "./chats.js";
 import { openCreateGroupModal, openEditGroupModal } from "./groups.js";
 import { CallController, renderCallsView } from "./calls.js";
@@ -104,6 +108,8 @@ function setupAppEvents() {
     event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`;
   });
   $("#attach-button").addEventListener("click", uploadCurrentFile);
+  $("#voice-record-button").addEventListener("click", toggleVoiceRecording);
+  $("#cancel-composer-context").addEventListener("click", cancelReply);
   $("#audio-call-button").addEventListener("click", () =>
     callController.startFromContext("audio"),
   );
@@ -143,6 +149,11 @@ function setupServerEvents() {
             `Nuevo mensaje de ${message.data.senderDisplayName || "Chad"}`,
           );
         }
+        await refreshBootstrap(false);
+        renderCurrentList();
+        break;
+      case "message:updated":
+        updateMessage(message.data);
         await refreshBootstrap(false);
         renderCurrentList();
         break;
@@ -401,6 +412,7 @@ function updatePresence(connectedUserIds) {
 
 async function handleLogout() {
   try {
+    cancelVoiceRecording();
     if (state.activeCall) {
       await callController.endActive();
     } else {
