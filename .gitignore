@@ -26,3 +26,15 @@ out/
 build/
 
 ignore.txt
+ignore/
+
+# Datos generados localmente
+database/*.sqlite
+database/*.sqlite-shm
+database/*.sqlite-wal
+storage/uploads/avatars/*
+storage/uploads/images/*
+storage/uploads/documents/*
+storage/uploads/audio/*
+storage/uploads/video/*
+!storage/uploads/**/.gitkeep

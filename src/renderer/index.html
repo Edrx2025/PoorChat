@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:;"
+    />
+    <title>Chad</title>
+    <link rel="stylesheet" href="css/themes.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/animations.css" />
+  </head>
+  <body>
+    <section id="auth-screen" class="auth-screen">
+      <div class="auth-brand">
+        <img
+          src="assets/chad-mark.png"
+          alt="Chad"
+          class="auth-brand-image"
+        />
+        <div class="auth-brand-copy">
+          <span class="brand-kicker">Chad Desktop</span>
+          <h1>Tu equipo, en un solo lugar.</h1>
+          <p>Mensajes, archivos y llamadas sobre TCP y UDP.</p>
+        </div>
+        <div class="auth-signal" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="auth-panel">
+        <div class="auth-panel-inner">
+          <div class="segmented-control" id="auth-tabs">
+            <button type="button" class="segment active" data-auth-tab="login">
+              Iniciar sesión
+            </button>
+            <button type="button" class="segment" data-auth-tab="register">
+              Crear cuenta
+            </button>
+          </div>
+
+          <form id="login-form" class="auth-form">
+            <header>
+              <span class="eyebrow">Bienvenido</span>
+              <h2>Entrar a Chad</h2>
+            </header>
+
+            <label class="field">
+              <span>Username</span>
+              <input
+                id="login-username"
+                name="username"
+                autocomplete="username"
+                placeholder="user1"
+                required
+              />
+            </label>
+
+            <label class="field">
+              <span>Contraseña</span>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="••••••"
+                required
+              />
+            </label>
+
+            <div class="network-fields">
+              <label class="field">
+                <span>Servidor</span>
+                <input id="server-host" value="127.0.0.1" required />
+              </label>
+              <label class="field compact">
+                <span>Puerto</span>
+                <input
+                  id="server-port"
+                  type="number"
+                  min="1"
+                  max="65535"
+                  value="5050"
+                  required
+                />
+              </label>
+            </div>
+
+            <button class="primary-button auth-submit" type="submit">
+              <span>Conectar</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+            <p id="login-feedback" class="form-feedback" aria-live="polite"></p>
+          </form>
+
+          <form id="register-form" class="auth-form hidden">
+            <header>
+              <span class="eyebrow">Nueva cuenta</span>
+              <h2>Crear perfil</h2>
+            </header>
+
+            <label class="field">
+              <span>Username único</span>
+              <input
+                id="register-username"
+                autocomplete="username"
+                placeholder="user5"
+                required
+              />
+            </label>
+
+            <label class="field">
+              <span>Nombre visible</span>
+              <input
+                id="register-display-name"
+                autocomplete="name"
+                placeholder="User Five"
+                required
+              />
+            </label>
+
+            <label class="field">
+              <span>Contraseña</span>
+              <input
+                id="register-password"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Mínimo 6 caracteres"
+                required
+              />
+            </label>
+
+            <button class="primary-button auth-submit" type="submit">
+              <span>Registrar cuenta</span>
+              <i data-lucide="user-plus"></i>
+            </button>
+            <p
+              id="register-feedback"
+              class="form-feedback"
+              aria-live="polite"
+            ></p>
+          </form>
+
+          <div class="demo-credentials">
+            <span>Demo</span>
+            <code>user1 / 123456</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="app-shell" class="app-shell hidden">
+      <nav class="nav-rail" aria-label="Navegación principal">
+        <div class="nav-brand">
+          <img src="assets/chad-mark.png" alt="Chad" />
+        </div>
+
+        <div class="nav-section">
+          <button class="nav-button active" data-view="chats" title="Chats">
+            <i data-lucide="message-circle"></i>
+            <span>Chats</span>
+          </button>
+          <button class="nav-button" data-view="groups" title="Grupos">
+            <i data-lucide="users"></i>
+            <span>Grupos</span>
+          </button>
+          <button class="nav-button" data-view="calls" title="Llamadas">
+            <i data-lucide="phone"></i>
+            <span>Llamadas</span>
+          </button>
+        </div>
+
+        <div class="nav-section nav-bottom">
+          <button class="nav-button" data-view="settings" title="Ajustes">
+            <i data-lucide="settings"></i>
+            <span>Ajustes</span>
+          </button>
+          <button id="theme-quick-toggle" class="nav-button" title="Cambiar tema">
+            <i data-lucide="sun-moon"></i>
+            <span>Tema</span>
+          </button>
+          <button id="profile-rail-button" class="profile-rail-button">
+            <span id="rail-avatar" class="avatar avatar-sm"></span>
+          </button>
+        </div>
+      </nav>
+
+      <aside class="list-pane">
+        <header class="list-pane-header">
+          <div>
+            <span id="view-kicker" class="eyebrow">Conversaciones</span>
+            <h2 id="view-title">Chats</h2>
+          </div>
+          <button id="create-action-button" class="icon-button" title="Crear">
+            <i data-lucide="plus"></i>
+          </button>
+        </header>
+
+        <label class="search-box">
+          <i data-lucide="search"></i>
+          <input id="list-search" placeholder="Buscar" />
+        </label>
+
+        <div id="list-content" class="list-content"></div>
+
+        <footer class="account-summary">
+          <span id="account-avatar" class="avatar avatar-md"></span>
+          <div>
+            <strong id="account-display-name">Usuario</strong>
+            <span id="account-username">@username</span>
+          </div>
+          <span id="account-status-dot" class="status-dot online"></span>
+        </footer>
+      </aside>
+
+      <main id="workspace" class="workspace">
+        <section id="empty-state" class="empty-state">
+          <img src="assets/chad-mark.png" alt="" />
+          <h2>Selecciona una conversación</h2>
+          <p>Inicia un chat, abre un grupo o revisa tus llamadas.</p>
+          <button id="empty-new-chat" class="secondary-button">
+            <i data-lucide="message-square-plus"></i>
+            Nuevo chat
+          </button>
+        </section>
+
+        <section id="conversation-view" class="conversation-view hidden">
+          <header class="conversation-header">
+            <div class="conversation-identity">
+              <span id="conversation-avatar" class="avatar avatar-lg"></span>
+              <div>
+                <h2 id="conversation-title">Conversación</h2>
+                <p id="conversation-subtitle">Sin conexión</p>
+              </div>
+            </div>
+            <div class="conversation-actions">
+              <button id="audio-call-button" class="icon-button" title="Llamada">
+                <i data-lucide="phone"></i>
+              </button>
+              <button
+                id="video-call-button"
+                class="icon-button"
+                title="Videollamada"
+              >
+                <i data-lucide="video"></i>
+              </button>
+              <button id="details-button" class="icon-button" title="Detalles">
+                <i data-lucide="info"></i>
+              </button>
+            </div>
+          </header>
+
+          <div id="messages-container" class="messages-container"></div>
+
+          <div id="upload-progress" class="upload-progress hidden">
+            <div></div>
+            <span>Enviando archivo</span>
+          </div>
+
+          <footer class="composer">
+            <button id="attach-button" class="icon-button" title="Adjuntar archivo">
+              <i data-lucide="paperclip"></i>
+            </button>
+            <textarea
+              id="message-input"
+              rows="1"
+              maxlength="4000"
+              placeholder="Escribe un mensaje"
+            ></textarea>
+            <button id="send-message-button" class="send-button" title="Enviar">
+              <i data-lucide="send"></i>
+            </button>
+          </footer>
+        </section>
+
+        <section id="calls-view" class="section-view hidden"></section>
+        <section id="settings-view" class="section-view hidden"></section>
+      </main>
+
+      <aside id="details-pane" class="details-pane">
+        <button id="close-details" class="icon-button details-close" title="Cerrar">
+          <i data-lucide="x"></i>
+        </button>
+        <div id="details-content"></div>
+      </aside>
+    </div>
+
+    <aside id="incoming-call" class="incoming-call hidden" aria-live="assertive">
+      <span id="incoming-avatar" class="avatar avatar-xl"></span>
+      <div class="incoming-call-copy">
+        <span id="incoming-type">Llamada entrante</span>
+        <strong id="incoming-name">Usuario</strong>
+      </div>
+      <div class="incoming-actions">
+        <button id="reject-call-button" class="call-action reject" title="Rechazar">
+          <i data-lucide="phone-off"></i>
+        </button>
+        <button id="accept-call-button" class="call-action accept" title="Aceptar">
+          <i data-lucide="phone"></i>
+        </button>
+      </div>
+    </aside>
+
+    <section id="call-overlay" class="call-overlay hidden">
+      <div class="call-stage">
+        <video id="remote-video" class="remote-video" autoplay playsinline></video>
+        <img
+          id="remote-frame"
+          class="remote-frame hidden"
+          alt="Video remoto"
+        />
+        <div id="audio-call-visual" class="audio-call-visual">
+          <span id="call-avatar" class="avatar avatar-call"></span>
+          <div class="audio-rings"><span></span><span></span><span></span></div>
+        </div>
+        <video
+          id="local-video"
+          class="local-video"
+          autoplay
+          muted
+          playsinline
+        ></video>
+        <div class="call-copy">
+          <span id="call-status">Conectando</span>
+          <h2 id="call-name">Llamada</h2>
+          <time id="call-duration">00:00</time>
+        </div>
+        <div class="call-controls">
+          <button id="toggle-microphone" class="call-control" title="Micrófono">
+            <i data-lucide="mic"></i>
+          </button>
+          <button id="toggle-camera" class="call-control" title="Cámara">
+            <i data-lucide="video"></i>
+          </button>
+          <button id="end-call-button" class="call-control end" title="Finalizar">
+            <i data-lucide="phone-off"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <div id="modal-backdrop" class="modal-backdrop hidden">
+      <section id="modal" class="modal" role="dialog" aria-modal="true"></section>
+    </div>
+
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <script src="../../node_modules/lucide/dist/umd/lucide.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

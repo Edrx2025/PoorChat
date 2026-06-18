@@ -1,0 +1,91 @@
+const path = require("path");
+const fs = require("fs");
+const { fileToDataUrl } = require("./fileUtils");
+
+function mimeFromFilePath(filePath) {
+  const extension = path.extname(filePath || "").toLowerCase();
+
+  if ([".jpg", ".jpeg"].includes(extension)) return "image/jpeg";
+  if (extension === ".webp") return "image/webp";
+  return "image/png";
+}
+
+function publicUser(user) {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    profilePicture: user.profilePicture,
+    avatarData: user.profilePicture
+      ? fileToDataUrl(user.profilePicture, mimeFromFilePath(user.profilePicture))
+      : null,
+    status: user.status,
+    theme: user.theme,
+    createdAt: user.createdAt,
+  };
+}
+
+function presentMessage(message) {
+  if (!message) return null;
+
+  let filePreviewData = null;
+  if (
+    message.filePath &&
+    message.fileSize <= 8 * 1024 * 1024 &&
+    ["image", "audio", "video"].includes(message.fileType) &&
+    fs.existsSync(message.filePath)
+  ) {
+    filePreviewData = fileToDataUrl(
+      message.filePath,
+      message.fileMimeType || "application/octet-stream",
+    );
+  }
+
+  return {
+    ...message,
+    senderAvatarData: message.senderProfilePicture
+      ? fileToDataUrl(
+          message.senderProfilePicture,
+          mimeFromFilePath(message.senderProfilePicture),
+        )
+      : null,
+    file: message.fileId
+      ? {
+          id: message.fileId,
+          originalName: message.fileOriginalName,
+          fileType: message.fileType,
+          mimeType: message.fileMimeType,
+          size: message.fileSize,
+          previewData: filePreviewData,
+        }
+      : null,
+  };
+}
+
+function presentCall(call) {
+  if (!call) return null;
+
+  return {
+    ...call,
+    callerAvatarData: call.callerProfilePicture
+      ? fileToDataUrl(
+          call.callerProfilePicture,
+          mimeFromFilePath(call.callerProfilePicture),
+        )
+      : null,
+    receiverAvatarData: call.receiverProfilePicture
+      ? fileToDataUrl(
+          call.receiverProfilePicture,
+          mimeFromFilePath(call.receiverProfilePicture),
+        )
+      : null,
+  };
+}
+
+module.exports = {
+  publicUser,
+  presentMessage,
+  presentCall,
+};
