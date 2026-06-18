@@ -1,16 +1,390 @@
+/* ==========================================================================
+    VARIABLES GLOBALES Y CONFIGURACIÓN BASE
+   ========================================================================== */
+:root {
+  --bg-main: #0a1323; /* Fondo profundo de la app */
+  --bg-card: #132237; /* Tarjeta de login y headers */
+  --bg-sidebar: #0e1b2f; /* Barra lateral de contactos */
+  --accent-color: #ffd902; /* Tu color amarillo característico */
+  --accent-hover: #e0be00; /* Amarillo para estados hover */
+  --text-primary: #f0f5fa; /* Texto principal brillante */
+  --text-muted: #8fa0b5; /* Texto secundario / leyendas */
+  --bubble-mine: #1e3d59; /* Tus burbujas de chat (Columna derecha) */
+  --bubble-theirs: #1b2d42; /* Burbujas de los demás (Columna izquierda) */
+  --border-ui: rgba(255, 255, 255, 0.08);
+  --error-color: #ff5555;
+  --success-color: #00e676;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
 body {
-  background-color: rgba(10, 21, 35, 0.962);
-  color: azure;
-  text-align: center;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
 }
 
-.login-header {
-  color: #ffd902fe;
-  font-family: sans-serif;
+/* ==========================================================================
+    PANTALLA DE LOGUEO (INTERFAZ NATIVA CENTRADA)
+   ========================================================================== */
+.fullscreen-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(
+    circle at center,
+    #162a45 0%,
+    var(--bg-main) 100%
+  );
 }
 
-#lbl-estado {
-  color: rgb(249, 203, 160);
-  font-weight: bold;
-  font-style: italic;
+.login-card {
+  background-color: var(--bg-card);
+  padding: 2.5rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-ui);
+}
+
+.login-header h1 {
+  color: var(--accent-color);
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.5px;
+}
+
+.login-form p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+
+.input-group {
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-ui);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(255, 217, 2, 0.15);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.9rem;
+  background-color: var(--accent-color);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  background-color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.login-footer {
+  margin-top: 1.5rem;
+}
+
+.status-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-text.desconectado {
+  color: var(--text-muted);
+}
+.status-text.conectando {
+  color: var(--accent-color);
+}
+.status-text.conectado {
+  color: var(--success-color);
+}
+.status-text.error {
+  color: var(--error-color);
+}
+
+/* ==========================================================================
+  ARQUITECTURA DE LA APLICACIÓN DE CHAT
+   ========================================================================== */
+.app-wrapper {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* BARRA LATERAL (CONTACTOS) */
+.sidebar {
+  width: 320px;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-ui);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 1.2rem 1.5rem;
+  background-color: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-ui);
+}
+
+.sidebar-header h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.badge {
+  background-color: rgba(255, 217, 2, 0.1);
+  color: var(--accent-color);
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.contacts-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.contact-item {
+  padding: 1.2rem 1.5rem;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background-color 0.15s ease;
+}
+
+.contact-item:hover,
+.contact-item.active {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.contact-item.active {
+  border-left: 4px solid var(--accent-color);
+  padding-left: 1.1rem;
+}
+
+/* ÁREA PRINCIPAL DEL CONTENEDOR DE CONVERSACIÓN */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-main);
+}
+
+.chat-header {
+  padding: 1rem 1.5rem;
+  background-color: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-ui);
+}
+
+.chat-info {
+  text-align: left;
+}
+
+.chat-info h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+
+#chat-target-status {
+  font-size: 0.8rem;
+  color: var(--success-color);
+}
+
+.chat-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.btn-icon:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* CUADRO DE ESCENARIO Y BURBUJAS DE TEXTO */
+.messages-area {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-image:
+    linear-gradient(rgba(10, 19, 35, 0.9), rgba(10, 19, 35, 0.9)),
+    url("https://web.whatsapp.com/img/bg-chat-tile-dark_a4be512e71954051127a3535f2e4da36.png"); /* Sutil patrón WhatsApp de fondo */
+}
+
+.system-message {
+  align-self: center;
+  background-color: rgba(19, 34, 55, 0.8);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border-ui);
+  max-width: 80%;
+}
+
+/* Alineación inteligente tridimensional de mensajes */
+.message-row {
+  display: flex;
+  width: 100%;
+}
+
+.message-row.mine {
+  justify-content: flex-end; /* Tus mensajes van a la derecha */
+}
+
+.message-row.theirs {
+  justify-content: flex-start; /* Los de tus amigos van a la izquierda */
+}
+
+.message-bubble {
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  max-width: 65%;
+  text-align: left;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.message-row.mine .message-bubble {
+  background-color: var(--bubble-mine);
+  border-top-right-radius: 0; /* Efecto pestaña de WhatsApp */
+}
+
+.message-row.theirs .message-bubble {
+  background-color: var(--bubble-theirs);
+  border-top-left-radius: 0;
+}
+
+.message-bubble strong {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--accent-color);
+  margin-bottom: 0.25rem;
+}
+
+.message-bubble p {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* PIE DE PÁGINA (HERRAMIENTAS DE REDACCIÓN) */
+.chat-footer {
+  padding: 1rem 1.5rem;
+  background-color: var(--bg-card);
+  border-top: 1px solid var(--border-ui);
+}
+
+.btn-secondary {
+  background: transparent;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.btn-secondary:hover {
+  color: var(--text-primary);
+}
+
+#input-mensaje {
+  flex: 1;
+  padding: 0.75rem 1.2rem;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-ui);
+  border-radius: 20px; /* Bordes redondeados modernos */
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+#input-mensaje:focus {
+  outline: none;
+  border-color: rgba(255, 217, 2, 0.5);
+}
+
+.btn-send {
+  background-color: var(--accent-color);
+  color: #000;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-send:hover {
+  background-color: var(--accent-hover);
 }
