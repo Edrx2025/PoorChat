@@ -1,4 +1,3 @@
-// src/main.js
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 
@@ -6,13 +5,13 @@ const path = require("path");
 const chatClient = require("./client/chatClient");
 // Importamos el diccionario oficial de protocolos del proyecto
 const MessageTypes = require("./protocol/messageTypes");
+// Importamos la configuración fija de red de Tailscale (Patrón Singleton/Config)
+const NetConfig = require("./network/puertos");
 
 // Variable global para mantener viva la referencia de la ventana de la interfaz
 let ventanaPrincipal = null;
 
-/**
- * Función encargada de instanciar y configurar la ventana gráfica (UI)
- */
+// Función encargada de instanciar y configurar la ventana gráfica (UI)
 function crearVentana() {
   ventanaPrincipal = new BrowserWindow({
     width: 1000,
@@ -36,7 +35,7 @@ function crearVentana() {
   });
 }
 
-// --- CICLO DE VIDA DE LA APLICACIÓN ---
+// --- Ciclo de vida de la app ---
 
 app.whenReady().then(() => {
   crearVentana();
@@ -53,21 +52,20 @@ app.on("window-all-closed", () => {
   }
 });
 
-// --- 🎛️ SECCIÓN DE ORQUESTACIÓN Y RUTEO (IPC MAIN) ---
+// -SECCIÓN DE ORQUESTACIÓN Y RUTEO (IPC MAIN)-
 
-/**
- * Escucha el evento 'intentar-login' disparado por la interfaz gráfica (renderer.js)
- * a través del cordón seguro de preload.js
- */
-ipcMain.on("intentar-login", (event, { ip, puerto, usuario }) => {
+/*Canal 1: Escucha el intento de login desde la interfaz gráfica (renderer.js).
+Ya no recibe IP ni Puerto desde la UI, usa las constantes estáticas de Tailscale.*/
+
+ipcMain.on("intentar-login", (event, { usuario }) => {
   console.log(
-    `[Main Process] Solicitud de conexión de red para: ${usuario} en ${ip}:${puerto}`,
+    `[Main Process] Conectando de forma transparente a Tailscale en ${NetConfig.SERVER_IP}:${NetConfig.SERVER_PORT} para el usuario: ${usuario}`,
   );
 
-  // Invocamos el método conectar del motor TCP pasándole las credenciales y las funciones de retorno (callbacks)
+  // Invocamos el método conectar usando las credenciales fijas del archivo de configuración
   chatClient.conectar(
-    ip,
-    parseInt(puerto),
+    NetConfig.SERVER_IP,
+    NetConfig.SERVER_PORT,
     usuario,
 
     // Callback 1: Se ejecuta automáticamente cada vez que llega un JSON del servidor de Carlos
@@ -91,10 +89,17 @@ ipcMain.on("intentar-login", (event, { ip, puerto, usuario }) => {
         ventanaPrincipal.webContents.send("servidor-respuesta", {
           type: MessageTypes.LOGIN_ERROR,
           payload: {
-            message: `No se pudo conectar al servidor: ${error.message}`,
+            message: `No se pudo conectar al servidor de Carlos: ${error.message}`,
           },
         });
       }
     },
   );
+});
+
+/*Canal 2: Mensajería de Texto
+Atrapa el texto plano enviado desde el submit de tu formulario de chat y le ordena al motor de red empujarlo por el socket TCP. */
+ipcMain.on("enviar-mensaje-texto", (event, texto) => {
+  console.log(`[Main Process] Despachando mensaje de texto hacia chatClient`);
+  chatClient.enviarMensaje(texto);
 });
