@@ -1,16 +1,21 @@
-// src/ui/preload.js
 const { contextBridge, ipcRenderer } = require("electron");
 
 // Exponemos una API segura y personalizada en el objeto global 'window'
 contextBridge.exposeInMainWorld("poorChatAPI", {
   /**
-   * Envía las credenciales de conexión al proceso principal (main.js)
-   * @param {string} ip - Dirección IP de Tailscale del servidor
-   * @param {string} puerto - Puerto de escucha TCP
+   * Envía la solicitud de inicio de sesión al proceso principal (main.js)
    * @param {string} usuario - Nombre de usuario para la sesión
    */
-  enviarLogin: (ip, puerto, usuario) => {
-    ipcRenderer.send("intentar-login", { ip, puerto, usuario });
+  enviarLogin: (usuario) => {
+    ipcRenderer.send("intentar-login", { usuario });
+  },
+
+  /**
+   * Envía un mensaje de texto plano hacia el proceso principal para ser despachado por TCP
+   * @param {string} texto - Cuerpo del mensaje que se va a transmitir
+   */
+  enviarMensajeTexto: (texto) => {
+    ipcRenderer.send("enviar-mensaje-texto", texto);
   },
 
   /**

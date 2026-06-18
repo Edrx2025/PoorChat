@@ -1,5 +1,3 @@
-// src/ui/renderer.js
-
 // --- ELEMENTOS DE LA ESTRUCTURA SEMÁNTICA (FORMULARIOS) ---
 const formLogin = document.getElementById("form-login");
 const formChatInput = document.getElementById("form-chat-input");
@@ -10,8 +8,7 @@ const chatContainer = document.getElementById("chat-container");
 const btnConectar = document.getElementById("btn-conectar");
 const lblEstado = document.getElementById("lbl-estado");
 
-const inputIp = document.getElementById("input-ip");
-const inputPuerto = document.getElementById("input-puerto");
+// Nota: Se eliminaron inputIp e inputPuerto ya que la red se gestiona en el backend
 const inputUsuario = document.getElementById("input-usuario");
 
 // --- ELEMENTOS DE LA PANTALLA DE CHAT ---
@@ -22,23 +19,21 @@ const inputMensaje = document.getElementById("input-mensaje");
 // Variable local para almacenar la identidad del usuario logueado
 let miUsuario = "";
 
-// --- 🔐 GESTIÓN DEL FORMULARIO DE AUTENTICACIÓN (FASE 4) ---
+// --- GESTIÓN DEL FORMULARIO DE AUTENTICACIÓN ---
 
 /**
  * Escucha el envío del formulario de login.
- * Se dispara tanto al hacer clic en el botón como al presionar 'Enter' en los inputs.
+ * Se dispara tanto al hacer clic en el botón como al presionar 'Enter' en el input.
  */
 formLogin.addEventListener("submit", (e) => {
-  // ⚠️ CRÍTICO: Evita que la página web de Electron se recargue/refresque al enviar el formulario
+  // Evita que la página web de Electron se recargue al enviar el formulario
   e.preventDefault();
 
-  const ip = inputIp.value.trim();
-  const puerto = inputPuerto.value.trim();
   const usuario = inputUsuario.value.trim();
 
-  // El atributo 'required' de HTML5 ya hace el trabajo, pero mantenemos esto como un doble escudo de seguridad
-  if (!ip || !puerto || !usuario) {
-    lblEstado.innerText = "Error: Todos los campos son obligatorios";
+  // Validación de seguridad para confirmar que el campo no esté vacío
+  if (!usuario) {
+    lblEstado.innerText = "Error: El nombre de usuario es obligatorio";
     cambiarEstiloEstado("error");
     return;
   }
@@ -48,11 +43,11 @@ formLogin.addEventListener("submit", (e) => {
   cambiarEstiloEstado("conectando");
   btnConectar.disabled = true;
 
-  // Invocación segura al puente del proceso principal (main.js)
-  window.poorChatAPI.enviarLogin(ip, puerto, usuario);
+  // Invocación simplificada: El proceso principal ya conoce la IP y el Puerto
+  window.poorChatAPI.enviarLogin(usuario);
 });
 
-// --- 💬 GESTIÓN DEL ENTRADA DE MENSAJES (FASE 5) ---
+// --- GESTIÓN DEL ENTRADA DE MENSAJES---
 
 /**
  * Escucha el envío del formulario de redacción del chat.
@@ -66,20 +61,18 @@ formChatInput.addEventListener("submit", (e) => {
   // Si el cuadro de mensaje está vacío, ignoramos la acción
   if (!texto) return;
 
-  // Pinta inmediatamente tu propio mensaje en tu interfaz local en la columna derecha
+  // 1. Pintamos inmediatamente tu propio mensaje en tu columna derecha (esMio = true)
   renderizarBurbujaTexto(miUsuario, texto, true);
 
-  // Limpia el cuadro de texto para el próximo mensaje y le devuelve el foco del teclado
+  // 2. TRANSMISIÓN REAL: Enviamos el texto al proceso principal a través del puente seguro
+  window.poorChatAPI.enviarMensajeTexto(texto);
+
+  // 3. Limpieza del cuadro de texto y devolución del foco del teclado
   inputMensaje.value = "";
   inputMensaje.focus();
-
-  /* 🚀 NOTA PARA MAÑANA (Fase 5):
-    Aquí añadirás la llamada a tu preload para empujar el texto al socket TCP:
-    window.poorChatAPI.enviarMensajeTexto(texto);
-  */
 });
 
-// --- 📡 RED Y SEÑALIZACIÓN TCP (ESCUCHA CENTRALIZADA) ---
+// -Red y señalización TCP ---
 
 window.poorChatAPI.recibirRespuesta((mensaje) => {
   console.log("[Renderer] Datos recibidos desde la capa de red:", mensaje.type);
@@ -94,7 +87,7 @@ window.poorChatAPI.recibirRespuesta((mensaje) => {
         loginContainer.style.display = "none";
         chatContainer.style.display = "flex";
         userTag.innerText = `@${miUsuario}`;
-        inputMensaje.focus(); // Coloca el cursor en el input del chat para mejorar la UX
+        inputMensaje.focus(); // Coloca el cursor directamente en el chat.
       }, 800);
       break;
 
@@ -105,12 +98,18 @@ window.poorChatAPI.recibirRespuesta((mensaje) => {
       break;
 
     case "TEXT_MESSAGE":
-      // Procesa y renderiza mensajes entrantes de otros compañeros en el chat room
-      renderizarBurbujaTexto(
-        mensaje.payload.emisor,
-        mensaje.payload.text,
-        false,
-      );
+      /**
+       * Escudo contra duplicación (UX de alta calidad):
+       * Como tú ya pintas tu mensaje localmente al enviarlo, solo pintaremos en la izquierda
+       * aquellos mensajes cuyo emisor sea un compañero diferente a ti.
+       */
+      if (mensaje.payload.emisor !== miUsuario) {
+        renderizarBurbujaTexto(
+          mensaje.payload.emisor,
+          mensaje.payload.text,
+          false,
+        );
+      }
       break;
 
     default:
@@ -121,7 +120,7 @@ window.poorChatAPI.recibirRespuesta((mensaje) => {
   }
 });
 
-// --- 🛠️ FUNCIONES AUXILIARES DE RENDERIZADO Y ESTILOS ---
+// --- FUNCIONES AUXILIARES DE RENDERIZADO Y ESTILOS ---
 
 /**
  * Modifica las clases CSS del texto de estado para actualizar los colores dinámicamente
