@@ -1,9 +1,22 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-function createElement() {
+function createElement(tagName = "div") {
   const classes = new Set(["hidden"]);
-  return {
+  const children = [];
+  const styleValues = new Map();
+  const element = {
+    tagName: tagName.toUpperCase(),
+    children,
+    dataset: {},
+    style: {
+      setProperty(name, value) {
+        styleValues.set(name, value);
+      },
+      getPropertyValue(name) {
+        return styleValues.get(name) || "";
+      },
+    },
     classList: {
       add(...names) {
         names.forEach((name) => classes.add(name));
@@ -22,11 +35,52 @@ function createElement() {
       },
     },
     addEventListener() {},
+    appendChild(child) {
+      children.push(child);
+      child.parentElement = element;
+      return child;
+    },
+    querySelector(selector) {
+      if (selector === "img") {
+        return children.find((child) => child.tagName === "IMG") || null;
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === ".video-tile.remote") {
+        return children.filter(
+          (child) =>
+            child.className?.includes("video-tile") &&
+            child.className?.includes("remote"),
+        );
+      }
+      return [];
+    },
+    remove() {
+      if (!element.parentElement) return;
+      const index = element.parentElement.children.indexOf(element);
+      if (index >= 0) element.parentElement.children.splice(index, 1);
+    },
     pause() {},
     srcObject: null,
     src: "",
     textContent: "",
+    className: "",
   };
+
+  Object.defineProperty(element, "innerHTML", {
+    get() {
+      return element._innerHTML || "";
+    },
+    set(value) {
+      element._innerHTML = value;
+      if (String(value).includes("<img")) {
+        element.appendChild(createElement("img"));
+      }
+    },
+  });
+
+  return element;
 }
 
 function deferred() {
@@ -45,6 +99,9 @@ test("la cámara se abre una sola vez y se detiene incluso si se cuelga durante 
     querySelector(selector) {
       if (!elements.has(selector)) elements.set(selector, createElement());
       return elements.get(selector);
+    },
+    createElement(tagName) {
+      return createElement(tagName);
     },
   };
   global.window = {
@@ -149,6 +206,9 @@ test("la llamada aceptada permanece minimizada hasta que el usuario la abre", as
       if (!elements.has(selector)) elements.set(selector, createElement());
       return elements.get(selector);
     },
+    createElement(tagName) {
+      return createElement(tagName);
+    },
   };
   global.window = {
     chad: {
@@ -208,6 +268,9 @@ test("el audio PCM recibido se programa en orden con Web Audio", async () => {
       if (!elements.has(selector)) elements.set(selector, createElement());
       return elements.get(selector);
     },
+    createElement(tagName) {
+      return createElement(tagName);
+    },
   };
   global.window = {
     chad: {
@@ -245,22 +308,108 @@ test("el audio PCM recibido se programa en orden con Web Audio", async () => {
 
   const samples = new Int16Array([32767, 0, -32768]);
   controller.playPcmAudio({
+    senderId: 7,
     sequence: 1,
     sampleRate: 16000,
     dataBase64: Buffer.from(samples.buffer).toString("base64"),
   });
   controller.playPcmAudio({
+    senderId: 7,
+    sequence: 1,
+    sampleRate: 16000,
+    dataBase64: Buffer.from(samples.buffer).toString("base64"),
+  });
+  controller.playPcmAudio({
+    senderId: 8,
     sequence: 1,
     sampleRate: 16000,
     dataBase64: Buffer.from(samples.buffer).toString("base64"),
   });
 
-  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled.length, 2);
   assert.equal(scheduled[0], 2.06);
+  assert.equal(scheduled[1], 2.06);
   assert.ok(channelData[0] > 0.99);
   assert.equal(channelData[1], 0);
   assert.equal(channelData[2], -1);
 
+  delete global.document;
+  delete global.window;
+});
+
+test("cada participante de una videollamada grupal conserva su propia cámara", async () => {
+  const elements = new Map();
+  global.document = {
+    querySelector(selector) {
+      if (!elements.has(selector)) elements.set(selector, createElement());
+      return elements.get(selector);
+    },
+    createElement(tagName) {
+      return createElement(tagName);
+    },
+  };
+  global.window = {
+    chad: {
+      media: {
+        onReceived() {},
+      },
+    },
+    addEventListener() {},
+  };
+
+  const [{ CallController }, { state }] = await Promise.all([
+    import("../src/renderer/js/calls.js"),
+    import("../src/renderer/js/state.js"),
+  ]);
+  state.currentUser = { id: 1, displayName: "User One" };
+  state.groups = [
+    {
+      id: 50,
+      members: [
+        { id: 1, displayName: "User One" },
+        { id: 2, displayName: "User Two" },
+        { id: 3, displayName: "User Three" },
+      ],
+    },
+  ];
+  state.activeCall = {
+    id: 500,
+    groupId: 50,
+    callType: "video",
+    status: "in_progress",
+    callerId: 1,
+  };
+
+  const controller = new CallController({ onCallsChanged() {} });
+  controller.handleMedia({
+    callId: 500,
+    senderId: 2,
+    mediaType: "video",
+    dataBase64: "frame-user-2",
+  });
+  controller.handleMedia({
+    callId: 500,
+    senderId: 3,
+    mediaType: "video",
+    dataBase64: "frame-user-3",
+  });
+
+  assert.equal(controller.remoteVideoTiles.size, 2);
+  assert.equal(
+    controller.remoteVideoTiles.get(2).frame.src,
+    "data:image/jpeg;base64,frame-user-2",
+  );
+  assert.equal(
+    controller.remoteVideoTiles.get(3).frame.src,
+    "data:image/jpeg;base64,frame-user-3",
+  );
+  assert.equal(
+    elements.get("#video-call-grid").dataset.participantCount,
+    "3",
+  );
+
+  state.activeCall = null;
+  state.groups = [];
   delete global.document;
   delete global.window;
 });

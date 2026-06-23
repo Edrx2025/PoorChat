@@ -112,6 +112,8 @@ export function renderConversationList(view, search, onSelect) {
 
 export async function openConversation(item) {
   cancelReply();
+  const messageInput = $("#message-input");
+  messageInput.style.height = "40px";
   state.activeContext = {
     type: item.contextType,
     id: item.contextId,

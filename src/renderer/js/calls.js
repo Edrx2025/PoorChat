@@ -22,8 +22,8 @@ export class CallController {
     this.audioSourceNode = null;
     this.audioProcessorNode = null;
     this.audioSilenceGain = null;
-    this.remoteAudioNextTime = 0;
-    this.lastAudioSequence = 0;
+    this.remoteAudioStates = new Map();
+    this.remoteVideoTiles = new Map();
     this.videoInterval = null;
     this.durationInterval = null;
     this.startedAt = null;
@@ -175,9 +175,9 @@ export class CallController {
       `<i data-lucide="${isVideo ? "video" : "phone"}"></i>`;
     setAvatar($("#call-avatar"), otherAvatar);
     $("#audio-call-visual").classList.toggle("hidden", isVideo);
-    $("#remote-frame").classList.toggle("hidden", !isVideo);
-    $("#local-video").classList.toggle("hidden", !isVideo);
+    $("#video-call-grid").classList.toggle("hidden", !isVideo);
     $("#toggle-camera").classList.toggle("hidden", !isVideo);
+    if (isVideo) this.updateVideoGridLayout();
     renderIcons();
   }
 
@@ -337,9 +337,10 @@ export class CallController {
     if (!state.activeCall || Number(media.callId) !== state.activeCall.id) return;
 
     if (media.mediaType === "video") {
-      $("#remote-frame").src = `data:image/jpeg;base64,${media.dataBase64}`;
-      $("#remote-frame").classList.remove("hidden");
+      const frame = this.getRemoteVideoFrame(Number(media.senderId));
+      frame.src = `data:image/jpeg;base64,${media.dataBase64}`;
       $("#audio-call-visual").classList.add("hidden");
+      $("#video-call-grid").classList.remove("hidden");
       return;
     }
 
@@ -365,10 +366,16 @@ export class CallController {
   }
 
   playPcmAudio(media) {
-    if (!this.audioContext || Number(media.sequence) <= this.lastAudioSequence) {
-      return;
-    }
-    this.lastAudioSequence = Number(media.sequence);
+    if (!this.audioContext) return;
+
+    const senderId = Number(media.senderId) || 0;
+    const audioState = this.remoteAudioStates.get(senderId) || {
+      lastSequence: 0,
+      nextTime: 0,
+    };
+    if (Number(media.sequence) <= audioState.lastSequence) return;
+
+    audioState.lastSequence = Number(media.sequence);
     this.audioContext.resume().catch(() => {});
 
     const bytes = base64ToBytes(media.dataBase64);
@@ -385,13 +392,76 @@ export class CallController {
     source.connect(this.audioContext.destination);
     const now = this.audioContext.currentTime;
     if (
-      this.remoteAudioNextTime < now ||
-      this.remoteAudioNextTime > now + 0.45
+      audioState.nextTime < now ||
+      audioState.nextTime > now + 0.45
     ) {
-      this.remoteAudioNextTime = now + 0.06;
+      audioState.nextTime = now + 0.06;
     }
-    source.start(this.remoteAudioNextTime);
-    this.remoteAudioNextTime += buffer.duration;
+    source.start(audioState.nextTime);
+    audioState.nextTime += buffer.duration;
+    this.remoteAudioStates.set(senderId, audioState);
+  }
+
+  getRemoteVideoFrame(senderId) {
+    const existing = this.remoteVideoTiles.get(senderId);
+    if (existing) return existing.frame;
+
+    const participant = this.findParticipant(senderId);
+    const tile = document.createElement("article");
+    tile.className = "video-tile remote";
+    tile.dataset.senderId = String(senderId);
+    tile.innerHTML = `
+      <img
+        class="participant-video"
+        alt="Cámara de ${escapeHtml(participant.displayName)}"
+      />
+      <span class="video-participant-name">
+        ${escapeHtml(participant.displayName)}
+      </span>
+    `;
+    const frame = tile.querySelector("img");
+    $("#video-call-grid").appendChild(tile);
+    this.remoteVideoTiles.set(senderId, { tile, frame });
+    this.updateVideoGridLayout();
+    return frame;
+  }
+
+  findParticipant(senderId) {
+    if (state.currentUser?.id === senderId) return state.currentUser;
+
+    if (state.activeCall?.groupId) {
+      const group = state.groups.find(
+        (item) => item.id === state.activeCall.groupId,
+      );
+      const member = group?.members?.find((item) => item.id === senderId);
+      if (member) return member;
+    }
+
+    return (
+      state.users.find((user) => user.id === senderId) || {
+        id: senderId,
+        displayName: `Usuario ${senderId}`,
+      }
+    );
+  }
+
+  updateVideoGridLayout() {
+    const grid = $("#video-call-grid");
+    if (!grid) return;
+
+    const participantCount = 1 + this.remoteVideoTiles.size;
+    const columns =
+      participantCount <= 1 ? 1 : participantCount <= 4 ? 2 : 3;
+    grid.style.setProperty("--video-columns", String(columns));
+    grid.dataset.participantCount = String(participantCount);
+  }
+
+  clearRemoteVideoTiles() {
+    for (const { tile } of this.remoteVideoTiles.values()) {
+      tile.remove();
+    }
+    this.remoteVideoTiles.clear();
+    this.updateVideoGridLayout();
   }
 
   async endActive() {
@@ -422,7 +492,6 @@ export class CallController {
     state.activeCall = null;
     this.releaseMedia();
     $("#local-video").srcObject = null;
-    $("#remote-frame").src = "";
     $("#call-duration").textContent = "00:00";
     $("#active-call-duration").textContent = "00:00";
     $("#active-call-indicator").classList.add("hidden");
@@ -452,8 +521,7 @@ export class CallController {
     this.audioSourceNode = null;
     this.audioProcessorNode = null;
     this.audioSilenceGain = null;
-    this.remoteAudioNextTime = 0;
-    this.lastAudioSequence = 0;
+    this.remoteAudioStates.clear();
     this.videoInterval = null;
     this.durationInterval = null;
     this.startedAt = null;
@@ -464,6 +532,7 @@ export class CallController {
       audio.src = "";
     }
     this.remoteAudioPlayers.clear();
+    this.clearRemoteVideoTiles();
 
     const localVideo = $("#local-video");
     if (localVideo) {

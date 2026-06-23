@@ -368,23 +368,22 @@
         >
           <i data-lucide="minimize-2"></i>
         </button>
-        <video id="remote-video" class="remote-video" autoplay playsinline></video>
-        <img
-          id="remote-frame"
-          class="remote-frame hidden"
-          alt="Video remoto"
-        />
+        <div id="video-call-grid" class="video-call-grid hidden">
+          <article id="local-video-tile" class="video-tile local">
+            <video
+              id="local-video"
+              class="participant-video"
+              autoplay
+              muted
+              playsinline
+            ></video>
+            <span class="video-participant-name">Tú</span>
+          </article>
+        </div>
         <div id="audio-call-visual" class="audio-call-visual">
           <span id="call-avatar" class="avatar avatar-call"></span>
           <div class="audio-rings"><span></span><span></span><span></span></div>
         </div>
-        <video
-          id="local-video"
-          class="local-video"
-          autoplay
-          muted
-          playsinline
-        ></video>
         <div class="call-copy">
           <span id="call-status">Conectando</span>
           <h2 id="call-name">Llamada</h2>
