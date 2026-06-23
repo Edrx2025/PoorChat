@@ -1,16 +1,29 @@
 {
-  "name": "proyect-poorchat",
+  "name": "chad-desktop",
   "version": "1.0.0",
-  "description": "",
-  "main": "src/main.js",
+  "description": "Plataforma académica de mensajería, archivos y llamadas con Electron, TCP, UDP y SQLite.",
+  "main": "src/main/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "server": "node src/backend/server/start.js",
+    "demo": "node scripts/run-demo.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check-syntax.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "electron",
+    "tcp",
+    "udp",
+    "sqlite",
+    "chat"
+  ],
+  "author": "Equipo Chad",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
     "electron": "^42.4.0"
+  },
+  "dependencies": {
+    "lucide": "^1.20.0"
   }
 }
