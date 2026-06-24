@@ -1,9 +1,15 @@
 const { publicUser } = require("../utils/presenters");
 
 class GroupService {
-  constructor(groupRepository, userRepository, notificationService) {
+  constructor(
+    groupRepository,
+    userRepository,
+    chatService,
+    notificationService,
+  ) {
     this.groupRepository = groupRepository;
     this.userRepository = userRepository;
+    this.chatService = chatService;
     this.notificationService = notificationService;
   }
 
@@ -25,6 +31,16 @@ class GroupService {
       createdBy: userId,
       memberIds: validMembers,
     });
+
+    for (const memberId of new Set(validMembers)) {
+      if (memberId === userId) continue;
+      const member = this.userRepository.findById(memberId);
+      this.chatService.createSystemMessage(
+        group.id,
+        memberId,
+        `${member.displayName} se unió al grupo.`,
+      );
+    }
 
     const result = this.getById(group.id);
     this.notificationService.notify(
@@ -61,7 +77,7 @@ class GroupService {
 
   update(userId, groupId, updates) {
     if (!this.groupRepository.isAdmin(groupId, userId)) {
-      throw new Error("Solo un administrador puede modificar el grupo");
+      throw new Error("Solo el dueño o un admin puede modificar el grupo");
     }
 
     const group = this.groupRepository.update(groupId, {
@@ -71,7 +87,18 @@ class GroupService {
     });
 
     if (Array.isArray(updates.memberIds)) {
-      this.groupRepository.addMembers(groupId, updates.memberIds.map(Number));
+      const validMemberIds = updates.memberIds
+        .map(Number)
+        .filter((id) => id > 0 && this.userRepository.findById(id));
+      const addedIds = this.groupRepository.addMembers(groupId, validMemberIds);
+      for (const memberId of addedIds) {
+        const member = this.userRepository.findById(memberId);
+        this.chatService.createSystemMessage(
+          groupId,
+          memberId,
+          `${member.displayName} se unió al grupo.`,
+        );
+      }
     }
 
     const result = this.getById(group.id);
@@ -81,6 +108,111 @@ class GroupService {
       result,
     );
 
+    return result;
+  }
+
+  promoteToAdmin(userId, groupId, targetUserId) {
+    const actor = this.requireMember(groupId, userId);
+    if (!["owner", "admin"].includes(actor.role)) {
+      throw new Error("Solo el dueño o un admin puede nombrar administradores");
+    }
+
+    const target = this.requireMember(groupId, targetUserId);
+    if (target.role === "owner") {
+      throw new Error("El dueño ya tiene todos los permisos");
+    }
+    if (target.role === "admin") {
+      throw new Error("Este integrante ya es admin");
+    }
+
+    this.groupRepository.updateMemberRole(groupId, targetUserId, "admin");
+    const user = this.userRepository.findById(targetUserId);
+    this.chatService.createSystemMessage(
+      groupId,
+      userId,
+      `${user.displayName} ahora es admin.`,
+    );
+    return this.notifyUpdated(groupId);
+  }
+
+  removeMember(userId, groupId, targetUserId) {
+    const actor = this.requireMember(groupId, userId);
+    const target = this.requireMember(groupId, targetUserId);
+    if (!["owner", "admin"].includes(actor.role)) {
+      throw new Error("No tienes permisos para expulsar integrantes");
+    }
+    if (target.userId === userId) {
+      throw new Error("Usa la opción Salir del grupo");
+    }
+    if (target.role === "owner") {
+      throw new Error("El dueño no puede ser expulsado");
+    }
+
+    const previousMemberIds = this.groupRepository.getMemberIds(groupId);
+    const targetUser = this.userRepository.findById(targetUserId);
+    this.groupRepository.removeMember(groupId, targetUserId);
+    this.chatService.createSystemMessage(
+      groupId,
+      userId,
+      `${targetUser.displayName} fue expulsado.`,
+    );
+    return this.notifyUpdated(groupId, previousMemberIds);
+  }
+
+  leave(userId, groupId) {
+    const member = this.requireMember(groupId, userId);
+    const previousMemberIds = this.groupRepository.getMemberIds(groupId);
+    const user = this.userRepository.findById(userId);
+
+    if (previousMemberIds.length === 1) {
+      this.groupRepository.delete(groupId);
+      this.notificationService.notify(
+        "group:removed",
+        previousMemberIds,
+        { groupId },
+      );
+      return { groupId, removed: true };
+    }
+
+    if (member.role === "owner") {
+      const successor = this.groupRepository.findOwnershipSuccessor(
+        groupId,
+        userId,
+      );
+      this.groupRepository.transferOwnership(
+        groupId,
+        userId,
+        successor.userId,
+      );
+    }
+
+    this.groupRepository.removeMember(groupId, userId);
+    this.chatService.createSystemMessage(
+      groupId,
+      userId,
+      `${user.displayName} abandonó el grupo.`,
+    );
+    return this.notifyUpdated(groupId, previousMemberIds);
+  }
+
+  requireMember(groupId, userId) {
+    const member = this.groupRepository.getMember(
+      Number(groupId),
+      Number(userId),
+    );
+    if (!member) throw new Error("El integrante no pertenece al grupo");
+    return member;
+  }
+
+  notifyUpdated(groupId, extraRecipientIds = []) {
+    const result = this.getById(groupId);
+    const recipients = [
+      ...new Set([
+        ...this.groupRepository.getMemberIds(groupId),
+        ...extraRecipientIds,
+      ]),
+    ];
+    this.notificationService.notify("group:updated", recipients, result);
     return result;
   }
 }

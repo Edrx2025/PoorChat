@@ -145,6 +145,18 @@ function registerIpcHandlers({
   ipcMain.handle("group:update", (_event, payload) =>
     tcpClient.request(MessageTypes.GROUP_UPDATE, payload),
   );
+  ipcMain.handle("group:promote", (_event, payload) =>
+    tcpClient.request(MessageTypes.GROUP_PROMOTE, payload),
+  );
+  ipcMain.handle("group:remove-member", (_event, payload) =>
+    tcpClient.request(MessageTypes.GROUP_REMOVE_MEMBER, payload),
+  );
+  ipcMain.handle("group:leave", (_event, payload) =>
+    tcpClient.request(MessageTypes.GROUP_LEAVE, payload),
+  );
+  ipcMain.handle("group:clear", (_event, payload) =>
+    tcpClient.request(MessageTypes.GROUP_CLEAR, payload),
+  );
   ipcMain.handle("file:list", (_event, payload) =>
     tcpClient.request(MessageTypes.FILE_LIST, payload),
   );
@@ -153,6 +165,9 @@ function registerIpcHandlers({
   );
   ipcMain.handle("call:accept", (_event, payload) =>
     tcpClient.request(MessageTypes.CALL_ACCEPT, payload),
+  );
+  ipcMain.handle("call:join", (_event, payload) =>
+    tcpClient.request(MessageTypes.CALL_JOIN, payload),
   );
   ipcMain.handle("call:reject", (_event, payload) =>
     tcpClient.request(MessageTypes.CALL_REJECT, payload),

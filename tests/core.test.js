@@ -60,6 +60,7 @@ const chatService = new ChatService(
 const groupService = new GroupService(
   groupRepository,
   userRepository,
+  chatService,
   notificationService,
 );
 const settingsService = new SettingsService(
@@ -285,7 +286,128 @@ test("creación de grupo y mensaje grupal", () => {
   });
 
   assert.equal(group.name, "Grupo Test");
+  assert.equal(
+    group.members.find((member) => member.id === user1.id).role,
+    "owner",
+  );
   assert.equal(message.groupId, group.id);
+});
+
+test("jerarquías, expulsión, salida y mensajes de sistema del grupo", () => {
+  const owner = userRepository.findByUsername("user1");
+  const admin = userRepository.findByUsername("user2");
+  const member = userRepository.findByUsername("user3");
+  const user4 = userRepository.findByUsername("user4");
+  const group = groupService.create(owner.id, {
+    name: "Grupo con jerarquías",
+    memberIds: [admin.id, member.id],
+  });
+
+  const promoted = groupService.promoteToAdmin(owner.id, group.id, admin.id);
+  assert.equal(
+    promoted.members.find((item) => item.id === admin.id).role,
+    "admin",
+  );
+  const promotedByAdmin = groupService.promoteToAdmin(
+    admin.id,
+    group.id,
+    member.id,
+  );
+  assert.equal(
+    promotedByAdmin.members.find((item) => item.id === member.id).role,
+    "admin",
+  );
+  assert.throws(
+    () => groupService.removeMember(admin.id, group.id, owner.id),
+    /dueño no puede ser expulsado/,
+  );
+
+  groupService.update(owner.id, group.id, { memberIds: [user4.id] });
+  let messages = chatService.getMessages(owner.id, {
+    contextType: "group",
+    contextId: group.id,
+  });
+  assert.ok(
+    messages.some(
+      (message) =>
+        message.messageType === "system" &&
+        message.content === `${user4.displayName} se unió al grupo.`,
+    ),
+  );
+
+  groupService.removeMember(admin.id, group.id, member.id);
+  assert.equal(groupRepository.isMember(group.id, member.id), false);
+  messages = chatService.getMessages(owner.id, {
+    contextType: "group",
+    contextId: group.id,
+  });
+  assert.ok(
+    messages.some(
+      (message) =>
+        message.messageType === "system" &&
+        message.content === `${member.displayName} fue expulsado.`,
+    ),
+  );
+
+  groupService.leave(user4.id, group.id);
+  assert.equal(groupRepository.isMember(group.id, user4.id), false);
+  messages = chatService.getMessages(owner.id, {
+    contextType: "group",
+    contextId: group.id,
+  });
+  assert.ok(
+    messages.some(
+      (message) =>
+        message.messageType === "system" &&
+        message.content === `${user4.displayName} abandonó el grupo.`,
+    ),
+  );
+
+  const afterOwnerLeaves = groupService.leave(owner.id, group.id);
+  assert.equal(groupRepository.isMember(group.id, owner.id), false);
+  assert.equal(
+    afterOwnerLeaves.members.find((item) => item.id === admin.id).role,
+    "owner",
+  );
+});
+
+test("moderadores borran mensajes y vacían el chat grupal", () => {
+  const owner = userRepository.findByUsername("user1");
+  const admin = userRepository.findByUsername("user2");
+  const member = userRepository.findByUsername("user3");
+  const group = groupService.create(owner.id, {
+    name: "Moderación de mensajes",
+    memberIds: [admin.id, member.id],
+  });
+  groupService.promoteToAdmin(owner.id, group.id, admin.id);
+
+  const memberMessage = chatService.sendText(member.id, {
+    contextType: "group",
+    contextId: group.id,
+    content: "Mensaje que será moderado",
+  });
+  const deleted = chatService.deleteMessage(admin.id, memberMessage.id);
+  assert.equal(deleted.deleted, true);
+  assert.equal(deleted.deletionReason, "admin");
+
+  chatService.sendText(member.id, {
+    contextType: "group",
+    contextId: group.id,
+    content: "Mensaje antes de vaciar",
+  });
+  assert.throws(
+    () => chatService.clearGroupChat(member.id, group.id),
+    /dueño o un admin/,
+  );
+  const cleared = chatService.clearGroupChat(owner.id, group.id);
+  assert.ok(cleared.deletedMessages >= 1);
+  assert.equal(
+    chatService.getMessages(owner.id, {
+      contextType: "group",
+      contextId: group.id,
+    }).length,
+    0,
+  );
 });
 
 test("transferencia de archivo por chunks", () => {
@@ -408,8 +530,17 @@ test("cada integrante decide si se une a una llamada grupal", () => {
     new Set(callService.getRecipientIds(started.id, user1.id)),
     new Set([user2.id]),
   );
+  assert.throws(
+    () =>
+      callService.start(user3.id, {
+        callType: "audio",
+        groupId: group.id,
+      }),
+    /llamada activa/,
+  );
 
-  const secondJoined = callService.accept(user3.id, started.id);
+  callService.reject(user3.id, started.id);
+  const secondJoined = callService.join(user3.id, started.id);
   assert.deepEqual(
     new Set(secondJoined.joinedParticipantIds),
     new Set([user1.id, user2.id, user3.id]),

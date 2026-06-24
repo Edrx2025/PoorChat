@@ -431,7 +431,7 @@ test("cada participante de una videollamada grupal conserva su propia cámara", 
   delete global.window;
 });
 
-test("un invitado grupal no activa medios hasta pulsar unirse", async () => {
+test("un invitado grupal no activa medios desde la actualización persistente", async () => {
   const elements = new Map();
   global.document = {
     querySelector(selector) {
@@ -480,11 +480,8 @@ test("un invitado grupal no activa medios hasta pulsar unirse", async () => {
 
   assert.equal(state.activeCall, null);
   assert.equal(mediaStarts, 0);
-  assert.equal(controller.incomingCall.id, 700);
-  assert.equal(
-    elements.get("#incoming-call").classList.contains("hidden"),
-    false,
-  );
+  assert.equal(controller.incomingCall, null);
+  assert.equal(elements.has("#incoming-call"), false);
 
   delete global.document;
   delete global.window;

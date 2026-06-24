@@ -153,6 +153,8 @@ class ChatRepository extends BaseRepository {
         m.pinned_by AS pinnedBy,
         m.pinned_at AS pinnedAt,
         m.deleted_at AS deletedAt,
+        m.deleted_by AS deletedBy,
+        m.deletion_reason AS deletionReason,
         m.created_at AS createdAt,
         u.username AS senderUsername,
         u.display_name AS senderDisplayName,
@@ -200,6 +202,8 @@ class ChatRepository extends BaseRepository {
           m.pinned_by AS pinnedBy,
           m.pinned_at AS pinnedAt,
           m.deleted_at AS deletedAt,
+          m.deleted_by AS deletedBy,
+          m.deletion_reason AS deletionReason,
           m.created_at AS createdAt,
           u.username AS senderUsername,
           u.display_name AS senderDisplayName,
@@ -279,7 +283,7 @@ class ChatRepository extends BaseRepository {
     return { chatId, clearedThroughMessageId: lastMessageId, hidden };
   }
 
-  softDeleteMessage(messageId) {
+  softDeleteMessage(messageId, deletedBy, deletionReason) {
     this.prepare(`
       UPDATE messages
       SET
@@ -289,11 +293,22 @@ class ChatRepository extends BaseRepository {
         is_pinned = 0,
         pinned_by = NULL,
         pinned_at = NULL,
-        deleted_at = CURRENT_TIMESTAMP
+        deleted_at = CURRENT_TIMESTAMP,
+        deleted_by = ?,
+        deletion_reason = ?
       WHERE id = ?
-    `).run(messageId);
+    `).run(deletedBy, deletionReason, messageId);
 
     return this.findMessageById(messageId);
+  }
+
+  clearGroupMessages(groupId) {
+    const result = this.prepare(`
+      DELETE FROM messages
+      WHERE group_id = ?
+    `).run(groupId);
+
+    return { groupId, deletedMessages: result.changes };
   }
 
   setMessagePinned(messageId, pinned, userId) {

@@ -65,8 +65,13 @@ export class CallController {
 
       const call = await api.startCall(payload);
       state.activeCall = call;
+      state.calls = [
+        call,
+        ...state.calls.filter((existing) => existing.id !== call.id),
+      ];
       this.updateCallUI(call, "Llamando");
       this.showCallIndicator();
+      this.onCallsChanged();
     } catch (error) {
       showToast(error.message, "error");
     }
@@ -106,6 +111,43 @@ export class CallController {
       this.updateCallUI(call, "En curso");
       this.showCallIndicator();
       await this.ensureMediaStarted(call);
+      this.onCallsChanged();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+
+  async openOrJoinGroupCall(callId) {
+    const knownCall = state.calls.find((call) => call.id === Number(callId));
+    if (!knownCall) return;
+
+    const participant = knownCall.participants?.find(
+      (item) => item.id === state.currentUser.id,
+    );
+    if (participant?.status === "joined") {
+      state.activeCall = knownCall;
+      this.updateCallUI(knownCall, "En curso");
+      this.showCallIndicator();
+      if (knownCall.status === "in_progress") {
+        await this.ensureMediaStarted(knownCall);
+      }
+      this.openCallOverlay();
+      return;
+    }
+
+    try {
+      const call = await api.joinCall(knownCall.id);
+      this.incomingCall = null;
+      $("#incoming-call").classList.add("hidden");
+      state.activeCall = call;
+      state.calls = [
+        call,
+        ...state.calls.filter((existing) => existing.id !== call.id),
+      ];
+      this.updateCallUI(call, "En curso");
+      this.showCallIndicator();
+      await this.ensureMediaStarted(call);
+      this.openCallOverlay();
       this.onCallsChanged();
     } catch (error) {
       showToast(error.message, "error");
@@ -162,9 +204,14 @@ export class CallController {
       this.showCallIndicator();
     } else if (!joined && activeStatus) {
       if (state.activeCall?.id === call.id) this.closeCallOverlay();
-      if (participant?.status === "invited") {
-        this.showIncoming(call);
-      } else if (this.incomingCall?.id === call.id) {
+      if (this.incomingCall?.id === call.id) {
+        if (participant?.status === "invited") {
+          this.showIncoming(call);
+        } else {
+          this.incomingCall = null;
+          $("#incoming-call").classList.add("hidden");
+        }
+      } else if (participant?.status !== "invited") {
         this.incomingCall = null;
         $("#incoming-call").classList.add("hidden");
       }

@@ -49,6 +49,7 @@ class ChatServer {
     this.groupService = new GroupService(
       this.groupRepository,
       this.userRepository,
+      this.chatService,
       this.notificationService,
     );
     this.settingsService = new SettingsService(
@@ -104,6 +105,8 @@ class ChatServer {
       "message:updated",
       "group:created",
       "group:updated",
+      "group:removed",
+      "group:cleared",
       "call:incoming",
       "call:updated",
       "settings:updated",
@@ -179,6 +182,25 @@ class ChatServer {
         return this.groupService.create(user.id, payload);
       case MessageTypes.GROUP_UPDATE:
         return this.groupService.update(user.id, Number(payload.groupId), payload);
+      case MessageTypes.GROUP_PROMOTE:
+        return this.groupService.promoteToAdmin(
+          user.id,
+          Number(payload.groupId),
+          Number(payload.targetUserId),
+        );
+      case MessageTypes.GROUP_REMOVE_MEMBER:
+        return this.groupService.removeMember(
+          user.id,
+          Number(payload.groupId),
+          Number(payload.targetUserId),
+        );
+      case MessageTypes.GROUP_LEAVE:
+        return this.groupService.leave(user.id, Number(payload.groupId));
+      case MessageTypes.GROUP_CLEAR:
+        return this.chatService.clearGroupChat(
+          user.id,
+          Number(payload.groupId),
+        );
       case MessageTypes.FILE_UPLOAD_START:
         return this.fileService.beginUpload(user.id, payload);
       case MessageTypes.FILE_UPLOAD_CHUNK:
@@ -193,6 +215,8 @@ class ChatServer {
         return this.callService.start(user.id, payload);
       case MessageTypes.CALL_ACCEPT:
         return this.callService.accept(user.id, Number(payload.callId));
+      case MessageTypes.CALL_JOIN:
+        return this.callService.join(user.id, Number(payload.callId));
       case MessageTypes.CALL_REJECT:
         return this.callService.reject(user.id, Number(payload.callId));
       case MessageTypes.CALL_END:

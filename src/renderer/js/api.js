@@ -16,6 +16,12 @@ export const api = {
   removeChat: (chatId) => window.chad.chat.remove({ chatId }),
   createGroup: (payload) => window.chad.group.create(payload),
   updateGroup: (payload) => window.chad.group.update(payload),
+  promoteGroupMember: (groupId, targetUserId) =>
+    window.chad.group.promote({ groupId, targetUserId }),
+  removeGroupMember: (groupId, targetUserId) =>
+    window.chad.group.removeMember({ groupId, targetUserId }),
+  leaveGroup: (groupId) => window.chad.group.leave({ groupId }),
+  clearGroup: (groupId) => window.chad.group.clear({ groupId }),
   uploadFile: (contextType, contextId, replyToId = null) =>
     window.chad.file.chooseAndUpload({ contextType, contextId, replyToId }),
   uploadRecordedAudio: (payload) =>
@@ -23,6 +29,7 @@ export const api = {
   downloadFile: (fileId) => window.chad.file.download({ fileId }),
   startCall: (payload) => window.chad.call.start(payload),
   acceptCall: (callId) => window.chad.call.accept({ callId }),
+  joinCall: (callId) => window.chad.call.join({ callId }),
   rejectCall: (callId) => window.chad.call.reject({ callId }),
   endCall: (callId) => window.chad.call.end({ callId }),
   updateSettings: (payload) => window.chad.settings.update(payload),

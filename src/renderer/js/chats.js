@@ -143,7 +143,71 @@ export async function openConversation(item) {
   }
 
   renderMessages();
+  renderGroupCallBanner();
   renderDetails();
+}
+
+export function renderGroupCallBanner() {
+  const banner = $("#group-call-banner");
+  if (!banner) return;
+
+  const isGroup = state.activeContext?.type === "group";
+  const call = isGroup
+    ? state.calls.find(
+        (item) =>
+          item.groupId === state.activeContext.id &&
+          ["started", "in_progress"].includes(item.status),
+      )
+    : null;
+
+  $("#audio-call-button").disabled = Boolean(call);
+  $("#video-call-button").disabled = Boolean(call);
+  if (!call) {
+    banner.classList.add("hidden");
+    banner.innerHTML = "";
+    return;
+  }
+
+  const currentParticipant = call.participants?.find(
+    (participant) => participant.id === state.currentUser.id,
+  );
+  const joined = (call.participants || []).filter(
+    (participant) => participant.status === "joined",
+  );
+  const hasJoined = currentParticipant?.status === "joined";
+
+  banner.innerHTML = `
+    <span class="group-call-banner-icon">
+      <i data-lucide="${call.callType === "video" ? "video" : "phone"}"></i>
+    </span>
+    <div class="group-call-banner-copy">
+      <strong>${call.callType === "video" ? "Videollamada" : "Llamada"} en curso</strong>
+      <span>${joined.length} ${joined.length === 1 ? "participante" : "participantes"}</span>
+    </div>
+    <div class="group-call-avatars">
+      ${joined
+        .slice(0, 6)
+        .map((participant) =>
+          avatarMarkup(participant, "avatar avatar-call-member"),
+        )
+        .join("")}
+    </div>
+    <button id="group-call-action" class="group-call-action" type="button">
+      <i data-lucide="${hasJoined ? "maximize-2" : "phone-call"}"></i>
+      ${hasJoined ? "Abrir" : "Unirse"}
+    </button>
+  `;
+  banner.classList.remove("hidden");
+  banner
+    .querySelector("#group-call-action")
+    .addEventListener("click", () => {
+      window.dispatchEvent(
+        new CustomEvent("chad:group-call-action", {
+          detail: { callId: call.id, joined: hasJoined },
+        }),
+      );
+    });
+  renderIcons();
 }
 
 export function renderMessages() {
@@ -324,6 +388,11 @@ export function renderDetails() {
   const isGroup = state.activeContext.type === "group";
   const source = state.activeContext.source;
   const members = isGroup ? source.members || [] : [];
+  const currentMembership = isGroup
+    ? members.find((member) => member.id === state.currentUser.id)
+    : null;
+  const currentRole = currentMembership?.role || "member";
+  const canModerate = ["owner", "admin"].includes(currentRole);
   const profile = isGroup
     ? { displayName: source.name, avatarData: source.avatar }
     : source.peer;
@@ -339,10 +408,7 @@ export function renderDetails() {
       }</p>
       ${
         isGroup &&
-        source.members?.some(
-          (member) =>
-            member.id === state.currentUser.id && member.role === "admin",
-        )
+        canModerate
           ? `
             <button id="edit-group-button" class="secondary-button" type="button">
               <i data-lucide="settings-2"></i>
@@ -360,15 +426,67 @@ export function renderDetails() {
                   (member) => `
                     <div class="member-row">
                       ${avatarMarkup(member, "avatar avatar-sm")}
-                      <div>
+                      <div class="member-row-copy">
                         <strong>${escapeHtml(member.displayName)}</strong>
-                        <span>@${escapeHtml(member.username)}</span>
+                        <span>
+                          @${escapeHtml(member.username)}
+                          <span class="role-badge role-${escapeHtml(member.role || "member")}">
+                            ${escapeHtml(roleLabel(member.role))}
+                          </span>
+                        </span>
                       </div>
-                      <span>${escapeHtml(member.role || "")}</span>
+                      <div class="member-row-actions">
+                        ${
+                          canModerate && member.role === "member"
+                            ? `
+                              <button
+                                class="member-action"
+                                type="button"
+                                data-promote-member="${member.id}"
+                                title="Hacer admin"
+                              >
+                                <i data-lucide="shield-plus"></i>
+                              </button>
+                            `
+                            : ""
+                        }
+                        ${
+                          canModerate &&
+                          member.id !== state.currentUser.id &&
+                          member.role !== "owner"
+                            ? `
+                              <button
+                                class="member-action danger"
+                                type="button"
+                                data-remove-member="${member.id}"
+                                title="Expulsar del grupo"
+                              >
+                                <i data-lucide="user-minus"></i>
+                              </button>
+                            `
+                            : ""
+                        }
+                      </div>
                     </div>
                   `,
                 )
                 .join("")}
+            </div>
+            <div class="conversation-management">
+              ${
+                canModerate
+                  ? `
+                    <button id="clear-group-button" class="secondary-button" type="button">
+                      <i data-lucide="eraser"></i>
+                      Vaciar chat
+                    </button>
+                  `
+                  : ""
+              }
+              <button id="leave-group-button" class="danger-button" type="button">
+                <i data-lucide="log-out"></i>
+                Salir del grupo
+              </button>
             </div>
           `
           : ""
@@ -411,7 +529,129 @@ export function renderDetails() {
   content.querySelector("#remove-chat-button")?.addEventListener("click", () => {
     openChatActionConfirmation("remove");
   });
+  content.querySelectorAll("[data-promote-member]").forEach((button) => {
+    button.addEventListener("click", () =>
+      confirmGroupMemberAction("promote", Number(button.dataset.promoteMember)),
+    );
+  });
+  content.querySelectorAll("[data-remove-member]").forEach((button) => {
+    button.addEventListener("click", () =>
+      confirmGroupMemberAction("remove", Number(button.dataset.removeMember)),
+    );
+  });
+  content.querySelector("#clear-group-button")?.addEventListener("click", () =>
+    confirmGroupAction("clear"),
+  );
+  content.querySelector("#leave-group-button")?.addEventListener("click", () =>
+    confirmGroupAction("leave"),
+  );
   renderIcons();
+}
+
+function roleLabel(role) {
+  return {
+    owner: "Dueño",
+    admin: "Admin",
+    member: "Miembro",
+  }[role] || "Miembro";
+}
+
+function confirmGroupMemberAction(action, targetUserId) {
+  const member = state.activeContext?.source?.members?.find(
+    (item) => item.id === targetUserId,
+  );
+  if (!member) return;
+
+  const promoting = action === "promote";
+  const { modal, close } = openModal(`
+    <header class="modal-header">
+      <h2>${promoting ? "Nombrar admin" : "Expulsar integrante"}</h2>
+      <button class="icon-button modal-close" title="Cerrar">
+        <i data-lucide="x"></i>
+      </button>
+    </header>
+    <p class="confirmation-copy">
+      ${
+        promoting
+          ? `${escapeHtml(member.displayName)} podrá gestionar integrantes y mensajes del grupo.`
+          : `${escapeHtml(member.displayName)} dejará de tener acceso a este grupo.`
+      }
+    </p>
+    <div class="modal-actions">
+      <button class="secondary-button modal-close" type="button">Cancelar</button>
+      <button id="confirm-group-member-action" class="${promoting ? "primary-button" : "danger-button"}" type="button">
+        ${promoting ? "Hacer admin" : "Expulsar"}
+      </button>
+    </div>
+  `);
+
+  modal
+    .querySelector("#confirm-group-member-action")
+    .addEventListener("click", async () => {
+      try {
+        const groupId = state.activeContext.id;
+        if (promoting) {
+          await api.promoteGroupMember(groupId, targetUserId);
+        } else {
+          await api.removeGroupMember(groupId, targetUserId);
+        }
+        close();
+        window.dispatchEvent(
+          new CustomEvent("chad:group-changed", { detail: { groupId } }),
+        );
+        showToast(promoting ? "Administrador asignado" : "Integrante expulsado");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
+}
+
+function confirmGroupAction(action) {
+  if (state.activeContext?.type !== "group") return;
+  const leaving = action === "leave";
+  const { modal, close } = openModal(`
+    <header class="modal-header">
+      <h2>${leaving ? "Salir del grupo" : "Vaciar chat"}</h2>
+      <button class="icon-button modal-close" title="Cerrar">
+        <i data-lucide="x"></i>
+      </button>
+    </header>
+    <p class="confirmation-copy">
+      ${
+        leaving
+          ? "Dejarás de ver el grupo y sus mensajes. Si eres el dueño, la propiedad pasará automáticamente a otro integrante."
+          : "Se eliminará el historial del grupo para todos sus integrantes."
+      }
+    </p>
+    <div class="modal-actions">
+      <button class="secondary-button modal-close" type="button">Cancelar</button>
+      <button id="confirm-group-action" class="danger-button" type="button">
+        ${leaving ? "Salir" : "Vaciar"}
+      </button>
+    </div>
+  `);
+
+  modal.querySelector("#confirm-group-action").addEventListener("click", async () => {
+    try {
+      const groupId = state.activeContext.id;
+      if (leaving) {
+        await api.leaveGroup(groupId);
+      } else {
+        await api.clearGroup(groupId);
+        state.messages = [];
+        renderMessages();
+      }
+      close();
+      window.dispatchEvent(
+        new CustomEvent(leaving ? "chad:group-left" : "chad:group-changed", {
+          detail: { groupId },
+        }),
+      );
+      showToast(leaving ? "Saliste del grupo" : "Chat del grupo vaciado");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
 }
 
 function openChatActionConfirmation(action) {
@@ -468,8 +708,25 @@ function openChatActionConfirmation(action) {
 }
 
 function messageMarkup(message) {
+  if (message.messageType === "system") {
+    return `
+      <div id="message-${message.id}" class="system-message">
+        <span>${escapeHtml(message.content)}</span>
+        <time>${formatDate(message.createdAt)}</time>
+      </div>
+    `;
+  }
+
   const own = message.senderId === state.currentUser.id;
   const deleted = message.deleted || message.messageType === "deleted";
+  const currentRole =
+    state.activeContext?.type === "group"
+      ? state.activeContext.source?.members?.find(
+          (member) => member.id === state.currentUser.id,
+        )?.role
+      : null;
+  const canDelete =
+    own || ["owner", "admin"].includes(currentRole);
   const fileMarkup = message.file
     ? `
       ${previewMarkup(message.file)}
@@ -516,7 +773,7 @@ function messageMarkup(message) {
           title="${message.isPinned ? "Desfijar" : "Fijar"}"
         ><i data-lucide="${message.isPinned ? "pin-off" : "pin"}"></i></button>
         ${
-          own
+          canDelete
             ? `
               <button
                 type="button"
@@ -555,7 +812,11 @@ function messageMarkup(message) {
         ${replyMarkup}
         ${
           deleted
-            ? '<p class="deleted-message-copy"><i data-lucide="ban"></i> Mensaje borrado</p>'
+            ? `<p class="deleted-message-copy"><i data-lucide="ban"></i> ${
+                message.deletionReason === "admin"
+                  ? "Eliminado por un admin"
+                  : "Mensaje borrado"
+              }</p>`
             : message.messageType === "text"
               ? `<p>${escapeHtml(message.content)}</p>`
               : ""

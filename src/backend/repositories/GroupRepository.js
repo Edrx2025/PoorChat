@@ -20,7 +20,7 @@ class GroupRepository extends BaseRepository {
         insertMember.run(
           groupId,
           userId,
-          userId === createdBy ? "admin" : "member",
+          userId === createdBy ? "owner" : "member",
         );
       }
 
@@ -58,9 +58,21 @@ class GroupRepository extends BaseRepository {
       this.prepare(`
         SELECT 1
         FROM group_members
-        WHERE group_id = ? AND user_id = ? AND role = 'admin'
+        WHERE group_id = ? AND user_id = ? AND role IN ('owner', 'admin')
       `).get(groupId, userId),
     );
+  }
+
+  getMember(groupId, userId) {
+    return this.prepare(`
+      SELECT
+        group_id AS groupId,
+        user_id AS userId,
+        role,
+        joined_at AS joinedAt
+      FROM group_members
+      WHERE group_id = ? AND user_id = ?
+    `).get(groupId, userId);
   }
 
   getMemberIds(groupId) {
@@ -86,7 +98,10 @@ class GroupRepository extends BaseRepository {
       FROM group_members gm
       JOIN users u ON u.id = gm.user_id
       WHERE gm.group_id = ?
-      ORDER BY CASE gm.role WHEN 'admin' THEN 0 ELSE 1 END, u.display_name
+      ORDER BY
+        CASE gm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
+        gm.joined_at,
+        u.display_name
     `).all(groupId);
   }
 
@@ -162,12 +177,64 @@ class GroupRepository extends BaseRepository {
       INSERT OR IGNORE INTO group_members (group_id, user_id, role)
       VALUES (?, ?, 'member')
     `);
+    const addedIds = [];
 
     for (const userId of memberIds) {
-      insert.run(groupId, userId);
+      const result = insert.run(groupId, userId);
+      if (result.changes) addedIds.push(userId);
     }
 
-    return this.listMembers(groupId);
+    return addedIds;
+  }
+
+  updateMemberRole(groupId, userId, role) {
+    this.prepare(`
+      UPDATE group_members
+      SET role = ?
+      WHERE group_id = ? AND user_id = ?
+    `).run(role, groupId, userId);
+
+    return this.getMember(groupId, userId);
+  }
+
+  removeMember(groupId, userId) {
+    return this.prepare(`
+      DELETE FROM group_members
+      WHERE group_id = ? AND user_id = ?
+    `).run(groupId, userId).changes > 0;
+  }
+
+  findOwnershipSuccessor(groupId, excludedUserId) {
+    return this.prepare(`
+      SELECT user_id AS userId, role
+      FROM group_members
+      WHERE group_id = ? AND user_id != ?
+      ORDER BY
+        CASE role WHEN 'admin' THEN 0 ELSE 1 END,
+        joined_at,
+        user_id
+      LIMIT 1
+    `).get(groupId, excludedUserId);
+  }
+
+  transferOwnership(groupId, fromUserId, toUserId) {
+    return this.database.transaction(() => {
+      this.updateMemberRole(groupId, fromUserId, "member");
+      this.updateMemberRole(groupId, toUserId, "owner");
+      this.prepare(`
+        UPDATE "groups"
+        SET created_by = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(toUserId, groupId);
+      return this.findById(groupId);
+    });
+  }
+
+  delete(groupId) {
+    return this.prepare(`
+      DELETE FROM "groups"
+      WHERE id = ?
+    `).run(groupId).changes > 0;
   }
 }
 
