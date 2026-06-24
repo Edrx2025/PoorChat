@@ -29,6 +29,11 @@ contextBridge.exposeInMainWorld("chad", {
   group: {
     create: (payload) => ipcRenderer.invoke("group:create", payload),
     update: (payload) => ipcRenderer.invoke("group:update", payload),
+    promote: (payload) => ipcRenderer.invoke("group:promote", payload),
+    removeMember: (payload) =>
+      ipcRenderer.invoke("group:remove-member", payload),
+    leave: (payload) => ipcRenderer.invoke("group:leave", payload),
+    clear: (payload) => ipcRenderer.invoke("group:clear", payload),
   },
   file: {
     chooseAndUpload: (payload) =>
@@ -42,6 +47,7 @@ contextBridge.exposeInMainWorld("chad", {
   call: {
     start: (payload) => ipcRenderer.invoke("call:start", payload),
     accept: (payload) => ipcRenderer.invoke("call:accept", payload),
+    join: (payload) => ipcRenderer.invoke("call:join", payload),
     reject: (payload) => ipcRenderer.invoke("call:reject", payload),
     end: (payload) => ipcRenderer.invoke("call:end", payload),
   },

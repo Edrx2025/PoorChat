@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS messages (
   pinned_by INTEGER,
   pinned_at TEXT,
   deleted_at TEXT,
+  deleted_by INTEGER,
+  deletion_reason TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(chat_id) REFERENCES private_chats(id) ON DELETE CASCADE,
   FOREIGN KEY(group_id) REFERENCES "groups"(id) ON DELETE CASCADE,
@@ -94,6 +96,7 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE SET NULL,
   FOREIGN KEY(reply_to_id) REFERENCES messages(id) ON DELETE SET NULL,
   FOREIGN KEY(pinned_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY(deleted_by) REFERENCES users(id) ON DELETE SET NULL,
   CHECK((chat_id IS NOT NULL AND group_id IS NULL) OR (chat_id IS NULL AND group_id IS NOT NULL))
 );
 

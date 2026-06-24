@@ -74,13 +74,25 @@ class ChatService {
 
   deleteMessage(userId, messageId) {
     const message = this.assertMessageAccess(userId, messageId);
-    if (message.senderId !== userId) {
+    if (message.deletedAt) throw new Error("El mensaje ya fue borrado");
+    if (message.messageType === "system") {
+      throw new Error("Los mensajes del sistema no se pueden borrar");
+    }
+
+    const deletingOwnMessage = message.senderId === userId;
+    const canModerateGroup =
+      message.groupId &&
+      this.groupRepository.isAdmin(message.groupId, userId);
+    if (!deletingOwnMessage && !canModerateGroup) {
       throw new Error("Solo puedes borrar tus propios mensajes");
     }
-    if (message.deletedAt) throw new Error("El mensaje ya fue borrado");
 
     const updated = presentMessage(
-      this.chatRepository.softDeleteMessage(messageId),
+      this.chatRepository.softDeleteMessage(
+        messageId,
+        userId,
+        deletingOwnMessage ? "self" : "admin",
+      ),
     );
     this.notifyMessageUpdated(message, updated);
     return updated;
@@ -115,6 +127,37 @@ class ChatService {
       userId,
       true,
     );
+  }
+
+  clearGroupChat(userId, groupId) {
+    this.assertContextAccess(userId, "group", groupId);
+    if (!this.groupRepository.isAdmin(groupId, userId)) {
+      throw new Error("Solo el dueño o un admin puede vaciar el chat");
+    }
+
+    const result = this.chatRepository.clearGroupMessages(groupId);
+    this.notificationService.notify(
+      "group:cleared",
+      this.groupRepository.getMemberIds(groupId),
+      result,
+    );
+    return result;
+  }
+
+  createSystemMessage(groupId, senderId, content) {
+    const saved = this.chatRepository.createMessage({
+      groupId,
+      senderId,
+      content: String(content || "").trim(),
+      messageType: "system",
+    });
+    const presented = presentMessage(saved);
+    this.notificationService.notify(
+      "message:new",
+      this.groupRepository.getMemberIds(groupId),
+      presented,
+    );
+    return presented;
   }
 
   createFileMessage(

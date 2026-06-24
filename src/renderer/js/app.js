@@ -19,6 +19,8 @@ import {
   openConversation,
   renderConversationList,
   renderDetails,
+  renderGroupCallBanner,
+  renderMessages,
   sendCurrentMessage,
   toggleVoiceRecording,
   uploadCurrentFile,
@@ -40,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
   callController = new CallController({
     onCallsChanged: () => {
       if (state.activeView === "calls") renderCallsView();
+      renderGroupCallBanner();
     },
   });
 });
@@ -161,6 +164,19 @@ function setupAppEvents() {
       },
     });
   });
+  window.addEventListener("chad:group-call-action", (event) => {
+    callController.openOrJoinGroupCall(event.detail.callId);
+  });
+  window.addEventListener("chad:group-changed", async () => {
+    await refreshBootstrap(false);
+    syncActiveGroupContext();
+    renderCurrentList();
+  });
+  window.addEventListener("chad:group-left", async () => {
+    closeActiveConversation();
+    await refreshBootstrap(false);
+    switchView("groups");
+  });
   window.addEventListener("chad:chat-cleared", async () => {
     await refreshBootstrap(false);
     renderCurrentList();
@@ -193,6 +209,30 @@ function setupServerEvents() {
         break;
       case "group:created":
       case "group:updated":
+        await refreshBootstrap(false);
+        syncActiveGroupContext();
+        renderCurrentList();
+        break;
+      case "group:removed":
+        await refreshBootstrap(false);
+        if (
+          state.activeContext?.type === "group" &&
+          state.activeContext.id === message.data.groupId
+        ) {
+          closeActiveConversation();
+          switchView("groups");
+        } else {
+          renderCurrentList();
+        }
+        break;
+      case "group:cleared":
+        if (
+          state.activeContext?.type === "group" &&
+          state.activeContext.id === message.data.groupId
+        ) {
+          state.messages = [];
+          renderMessages();
+        }
         await refreshBootstrap(false);
         renderCurrentList();
         break;
@@ -415,6 +455,38 @@ async function refreshBootstrap(updateAccount = true) {
   applyBootstrap(bootstrap);
   state.activeContext = activeContext;
   if (updateAccount) updateAccountUI();
+}
+
+function syncActiveGroupContext() {
+  if (state.activeContext?.type !== "group") return;
+
+  const group = state.groups.find(
+    (item) => item.id === state.activeContext.id,
+  );
+  if (!group) {
+    closeActiveConversation();
+    switchView("groups");
+    return;
+  }
+
+  state.activeContext.source = group;
+  state.activeContext.title = group.name;
+  state.activeContext.avatar = {
+    displayName: group.name,
+    avatarData: group.avatar,
+  };
+  $("#conversation-title").textContent = group.name;
+  $("#conversation-subtitle").textContent =
+    `${group.members?.length || 0} integrantes`;
+  renderDetails();
+  renderGroupCallBanner();
+}
+
+function closeActiveConversation() {
+  state.activeContext = null;
+  state.messages = [];
+  $("#conversation-view").classList.add("hidden");
+  $("#app-shell").classList.remove("details-open");
 }
 
 function updateAccountUI() {

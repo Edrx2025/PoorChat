@@ -18,10 +18,18 @@ class CallService {
   }
 
   start(userId, { callType, receiverId = null, groupId = null }) {
+    const normalizedGroupId = groupId ? Number(groupId) : null;
+    if (
+      normalizedGroupId &&
+      this.callRepository.findActiveForGroup(normalizedGroupId)
+    ) {
+      throw new Error("Ya hay una llamada activa en este grupo");
+    }
+
     const call = CallFactory.create(callType, {
       callerId: userId,
       receiverId: receiverId ? Number(receiverId) : null,
-      groupId: groupId ? Number(groupId) : null,
+      groupId: normalizedGroupId,
       status: "started",
     });
 
@@ -38,7 +46,11 @@ class CallService {
 
     this.userRepository.updateStatus(userId, "in_call");
     this.notificationService.notify("call:incoming", recipients, presented);
-    this.notificationService.notify("call:updated", [userId], presented);
+    this.notificationService.notify(
+      "call:updated",
+      [userId, ...recipients],
+      presented,
+    );
 
     const timeout = setTimeout(() => {
       const current = this.callRepository.findById(saved.id);
@@ -91,6 +103,37 @@ class CallService {
       updated,
     );
 
+    return {
+      ...updated,
+      udpPort: this.config.udpPort,
+    };
+  }
+
+  join(userId, callId) {
+    const call = this.callRepository.findById(callId);
+    if (
+      !call ||
+      !call.groupId ||
+      !["started", "in_progress"].includes(call.status)
+    ) {
+      throw new Error("La llamada grupal ya no está disponible");
+    }
+    if (!this.groupRepository.isMember(call.groupId, userId)) {
+      throw new Error("No perteneces a este grupo");
+    }
+
+    this.callRepository.upsertParticipantStatus(call.id, userId, "joined");
+    if (call.status === "started") {
+      this.callRepository.updateStatus(call.id, "in_progress");
+    }
+    this.userRepository.updateStatus(userId, "in_call");
+
+    const updated = this.present(this.callRepository.findById(call.id));
+    this.notificationService.notify(
+      "call:updated",
+      this.getParticipantIds(call),
+      updated,
+    );
     return {
       ...updated,
       udpPort: this.config.udpPort,
@@ -186,7 +229,10 @@ class CallService {
       .listParticipants(callId)
       .filter(
         (participant) =>
-          participant.status === "joined" && participant.id !== senderId,
+          participant.status === "joined" &&
+          participant.id !== senderId &&
+          (!call.groupId ||
+            this.groupRepository.isMember(call.groupId, participant.id)),
       )
       .map((participant) => participant.id);
   }

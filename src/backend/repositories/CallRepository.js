@@ -92,6 +92,27 @@ class CallRepository extends BaseRepository {
     return this.findParticipant(callId, userId);
   }
 
+  upsertParticipantStatus(callId, userId, status) {
+    this.prepare(`
+      INSERT INTO call_participants (
+        call_id,
+        user_id,
+        status,
+        joined_at,
+        left_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP)
+      ON CONFLICT(call_id, user_id) DO UPDATE SET
+        status = excluded.status,
+        joined_at = COALESCE(call_participants.joined_at, CURRENT_TIMESTAMP),
+        left_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(callId, userId, status);
+
+    return this.findParticipant(callId, userId);
+  }
+
   expireInvitations(callId) {
     this.prepare(`
       UPDATE call_participants
@@ -136,6 +157,31 @@ class CallRepository extends BaseRepository {
       LEFT JOIN "groups" g ON g.id = c.group_id
       WHERE c.id = ?
     `).get(callId);
+  }
+
+  findActiveForGroup(groupId) {
+    return this.prepare(`
+      SELECT
+        c.id,
+        c.call_type AS callType,
+        c.caller_id AS callerId,
+        c.receiver_id AS receiverId,
+        c.group_id AS groupId,
+        c.status,
+        c.started_at AS startedAt,
+        c.ended_at AS endedAt,
+        c.created_at AS createdAt,
+        caller.username AS callerUsername,
+        caller.display_name AS callerDisplayName,
+        caller.profile_picture AS callerProfilePicture,
+        g.name AS groupName
+      FROM calls c
+      JOIN users caller ON caller.id = c.caller_id
+      JOIN "groups" g ON g.id = c.group_id
+      WHERE c.group_id = ? AND c.status IN ('started', 'in_progress')
+      ORDER BY c.id DESC
+      LIMIT 1
+    `).get(groupId);
   }
 
   updateStatus(callId, status) {

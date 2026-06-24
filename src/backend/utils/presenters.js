@@ -50,6 +50,8 @@ function presentMessage(message) {
     content: deleted ? "" : message.content,
     isPinned: Boolean(message.isPinned),
     deleted,
+    deletedBy: message.deletedBy || null,
+    deletionReason: message.deletionReason || null,
     senderAvatarData: message.senderProfilePicture
       ? fileToDataUrl(
           message.senderProfilePicture,
