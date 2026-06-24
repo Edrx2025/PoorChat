@@ -330,6 +330,7 @@
         </button>
         <button id="accept-call-button" class="call-action accept" title="Aceptar">
           <i data-lucide="phone"></i>
+          <span id="incoming-accept-label">Aceptar</span>
         </button>
       </div>
     </aside>
@@ -372,11 +373,17 @@
           <article id="local-video-tile" class="video-tile local">
             <video
               id="local-video"
-              class="participant-video"
+              class="participant-video hidden"
               autoplay
               muted
               playsinline
             ></video>
+            <div
+              id="local-video-placeholder"
+              class="participant-video-placeholder"
+            >
+              <span id="local-call-avatar" class="avatar avatar-xl"></span>
+            </div>
             <span class="video-participant-name">Tú</span>
           </article>
         </div>
@@ -389,6 +396,7 @@
           <h2 id="call-name">Llamada</h2>
           <time id="call-duration">00:00</time>
         </div>
+        <div id="call-participants" class="call-participants"></div>
         <div class="call-controls">
           <button id="toggle-microphone" class="call-control" title="Micrófono">
             <i data-lucide="mic"></i>

@@ -165,6 +165,16 @@ class ChatServer {
           Number(payload.messageId),
           payload.pinned,
         );
+      case MessageTypes.CHAT_CLEAR:
+        return this.chatService.clearPrivateChat(
+          user.id,
+          Number(payload.chatId),
+        );
+      case MessageTypes.CHAT_REMOVE:
+        return this.chatService.removePrivateChat(
+          user.id,
+          Number(payload.chatId),
+        );
       case MessageTypes.GROUP_CREATE:
         return this.groupService.create(user.id, payload);
       case MessageTypes.GROUP_UPDATE:

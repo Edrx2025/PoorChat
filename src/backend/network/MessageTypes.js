@@ -8,6 +8,8 @@ module.exports = Object.freeze({
   CHAT_SEND: "chat:send",
   CHAT_DELETE: "chat:delete-message",
   CHAT_PIN: "chat:pin-message",
+  CHAT_CLEAR: "chat:clear",
+  CHAT_REMOVE: "chat:remove",
   GROUP_CREATE: "group:create",
   GROUP_UPDATE: "group:update",
   FILE_UPLOAD_START: "file:upload-start",

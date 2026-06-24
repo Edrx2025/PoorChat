@@ -54,6 +54,7 @@ function registerIpcHandlers({
       originalName,
       mimeType,
       size: fileBuffer.length,
+      replyToId: payload.replyToId || null,
     });
 
     for (
@@ -131,6 +132,12 @@ function registerIpcHandlers({
   );
   ipcMain.handle("chat:pin-message", (_event, payload) =>
     tcpClient.request(MessageTypes.CHAT_PIN, payload),
+  );
+  ipcMain.handle("chat:clear", (_event, payload) =>
+    tcpClient.request(MessageTypes.CHAT_CLEAR, payload),
+  );
+  ipcMain.handle("chat:remove", (_event, payload) =>
+    tcpClient.request(MessageTypes.CHAT_REMOVE, payload),
   );
   ipcMain.handle("group:create", (_event, payload) =>
     tcpClient.request(MessageTypes.GROUP_CREATE, payload),

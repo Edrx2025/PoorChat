@@ -1377,6 +1377,20 @@ audio.message-media-preview {
   text-align: left;
 }
 
+.conversation-management {
+  margin-top: 24px;
+  padding-top: 18px;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.confirmation-copy {
+  margin: 0 0 22px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
 .member-row {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
@@ -1399,7 +1413,7 @@ audio.message-media-preview {
   z-index: 40;
   top: 22px;
   right: 22px;
-  width: min(410px, calc(100vw - 44px));
+  width: min(470px, calc(100vw - 44px));
   min-height: 90px;
   padding: 14px;
   display: grid;
@@ -1523,12 +1537,29 @@ audio.message-media-preview {
 }
 
 .call-action {
-  width: 42px;
+  min-width: 42px;
   height: 42px;
+  padding: 0 12px;
+  gap: 7px;
 }
 
 .call-action.accept {
+  min-width: 104px;
+  display: flex;
+  justify-content: center;
+  border-radius: 999px;
   background: var(--accent-strong);
+}
+
+.call-action.accept span {
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.call-action.accept svg {
+  width: 18px;
+  height: 18px;
 }
 
 .call-action.reject,
@@ -1604,6 +1635,12 @@ audio.message-media-preview {
   justify-self: center;
 }
 
+.video-call-grid[data-participant-count="3"] .video-tile:last-child {
+  width: calc(50% - 5px);
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
 .participant-video {
   width: 100%;
   height: 100%;
@@ -1612,6 +1649,16 @@ audio.message-media-preview {
   display: block;
   object-fit: cover;
   background: #050806;
+}
+
+.participant-video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 45%, var(--accent-soft), transparent 34%),
+    #111613;
 }
 
 .video-participant-name {
@@ -1671,6 +1718,46 @@ audio.message-media-preview {
   margin: 7px 0;
   color: #fff;
   font-size: 26px;
+}
+
+.call-participants {
+  position: absolute;
+  z-index: 6;
+  top: 20px;
+  left: 20px;
+  max-width: min(48vw, 620px);
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+}
+
+.call-participant {
+  min-width: 0;
+  padding: 4px 8px 4px 4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  color: #fff;
+  background: rgba(3, 5, 4, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+}
+
+.call-participant .avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 9px;
+}
+
+.call-participant span {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .call-controls {

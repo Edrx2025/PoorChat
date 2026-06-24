@@ -26,6 +26,8 @@ class DatabaseConnection {
       CREATE INDEX IF NOT EXISTS idx_messages_reply ON messages(reply_to_id);
       CREATE INDEX IF NOT EXISTS idx_messages_pinned_chat ON messages(chat_id, is_pinned);
       CREATE INDEX IF NOT EXISTS idx_messages_pinned_group ON messages(group_id, is_pinned);
+      CREATE INDEX IF NOT EXISTS idx_call_participants_status
+        ON call_participants(call_id, status);
       UPDATE settings
       SET accent_color = '#c7db94'
       WHERE accent_color IN ('#2f8f73', '#43b993');

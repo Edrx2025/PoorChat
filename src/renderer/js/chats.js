@@ -6,6 +6,7 @@ import {
   escapeHtml,
   formatBytes,
   formatDate,
+  openModal,
   renderIcons,
   setAvatar,
   showToast,
@@ -372,6 +373,30 @@ export function renderDetails() {
           `
           : ""
       }
+      ${
+        !isGroup
+          ? `
+            <div class="conversation-management">
+              <button
+                id="clear-chat-button"
+                class="secondary-button"
+                type="button"
+              >
+                <i data-lucide="eraser"></i>
+                Vaciar chat
+              </button>
+              <button
+                id="remove-chat-button"
+                class="danger-button"
+                type="button"
+              >
+                <i data-lucide="message-square-x"></i>
+                Eliminar chat
+              </button>
+            </div>
+          `
+          : ""
+      }
     </div>
   `;
 
@@ -380,7 +405,66 @@ export function renderDetails() {
       new CustomEvent("chad:edit-group", { detail: source }),
     );
   });
+  content.querySelector("#clear-chat-button")?.addEventListener("click", () => {
+    openChatActionConfirmation("clear");
+  });
+  content.querySelector("#remove-chat-button")?.addEventListener("click", () => {
+    openChatActionConfirmation("remove");
+  });
   renderIcons();
+}
+
+function openChatActionConfirmation(action) {
+  if (state.activeContext?.type !== "private") return;
+
+  const removing = action === "remove";
+  const { modal, close } = openModal(`
+    <header class="modal-header">
+      <h2>${removing ? "Eliminar chat" : "Vaciar chat"}</h2>
+      <button class="icon-button modal-close" title="Cerrar">
+        <i data-lucide="x"></i>
+      </button>
+    </header>
+    <p class="confirmation-copy">
+      ${
+        removing
+          ? "La conversación desaparecerá de tu lista. Volverá a mostrarse si alguno envía un mensaje nuevo."
+          : "Los mensajes actuales dejarán de mostrarse para tu cuenta. Esta acción no afecta al otro usuario."
+      }
+    </p>
+    <div class="modal-actions">
+      <button class="secondary-button modal-close" type="button">Cancelar</button>
+      <button id="confirm-chat-action" class="danger-button" type="button">
+        ${removing ? "Eliminar" : "Vaciar"}
+      </button>
+    </div>
+  `);
+
+  modal.querySelector("#confirm-chat-action").addEventListener(
+    "click",
+    async () => {
+      try {
+        const chatId = state.activeContext.id;
+        if (removing) {
+          await api.removeChat(chatId);
+        } else {
+          await api.clearChat(chatId);
+          state.messages = [];
+          renderMessages();
+        }
+        close();
+        window.dispatchEvent(
+          new CustomEvent(
+            removing ? "chad:chat-removed" : "chad:chat-cleared",
+            { detail: { chatId } },
+          ),
+        );
+        showToast(removing ? "Chat eliminado" : "Chat vaciado");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    },
+  );
 }
 
 function messageMarkup(message) {

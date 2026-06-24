@@ -13,7 +13,12 @@ class ChatService {
       throw new Error("No puedes crear un chat contigo mismo");
     }
 
-    return this.chatRepository.findOrCreatePrivateChat(userId, targetUserId);
+    const chat = this.chatRepository.findOrCreatePrivateChat(
+      userId,
+      targetUserId,
+    );
+    this.chatRepository.showPrivateChatForUser(chat.id, userId);
+    return chat;
   }
 
   listPrivateChats(userId) {
@@ -25,7 +30,14 @@ class ChatService {
 
     const messages =
       contextType === "private"
-        ? this.chatRepository.listMessages({ chatId: contextId })
+        ? this.chatRepository.listMessages({
+            chatId: contextId,
+            afterMessageId:
+              this.chatRepository.getClearedThroughMessageId(
+                contextId,
+                userId,
+              ),
+          })
         : this.chatRepository.listMessages({ groupId: contextId });
 
     return messages.map(presentMessage);
@@ -50,6 +62,9 @@ class ChatService {
     });
 
     const saved = this.chatRepository.createMessage(message);
+    if (contextType === "private") {
+      this.chatRepository.revealPrivateChatForMembers(contextId);
+    }
     const presented = presentMessage(saved);
     const recipients = this.getContextMemberIds(contextType, contextId);
 
@@ -84,6 +99,24 @@ class ChatService {
     return updated;
   }
 
+  clearPrivateChat(userId, chatId) {
+    this.assertContextAccess(userId, "private", chatId);
+    return this.chatRepository.clearPrivateChatForUser(
+      chatId,
+      userId,
+      false,
+    );
+  }
+
+  removePrivateChat(userId, chatId) {
+    this.assertContextAccess(userId, "private", chatId);
+    return this.chatRepository.clearPrivateChatForUser(
+      chatId,
+      userId,
+      true,
+    );
+  }
+
   createFileMessage(
     userId,
     contextType,
@@ -102,6 +135,9 @@ class ChatService {
     });
 
     const saved = this.chatRepository.createMessage(message);
+    if (contextType === "private") {
+      this.chatRepository.revealPrivateChatForMembers(contextId);
+    }
     const presented = presentMessage(saved);
     const recipients = this.getContextMemberIds(contextType, contextId);
 

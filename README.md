@@ -20,6 +20,7 @@ programación orientada a objetos y patrones de diseño.
 - Audio PCM de baja latencia y frames de video retransmitidos mediante UDP.
 - Notificación flotante de llamada entrante.
 - Indicador persistente de llamada con vista completa opcional.
+- Unión individual a llamadas grupales y lista de participantes activos.
 - Historial de llamadas.
 - Foto de perfil.
 - Cambio de username, nombre, contraseña y estado.
@@ -282,6 +283,17 @@ La solicitud, aceptación, rechazo y finalización viajan por TCP. Al aceptar:
 - El servidor UDP retransmite los paquetes a los participantes.
 - La llamada permanece en un indicador no bloqueante hasta que el usuario abre
   voluntariamente la vista completa.
+- En grupos, cada invitado debe pulsar `Unirse`; aceptar por parte de un
+  integrante no activa cámara ni micrófono en los demás.
+- La interfaz muestra únicamente participantes unidos y separa cada cámara en
+  su propio panel.
+
+## Gestión local de chats
+
+- `Vaciar chat` oculta el historial existente solo para la cuenta actual.
+- `Eliminar chat` quita la conversación de la lista solo para la cuenta actual.
+- Un mensaje nuevo vuelve a mostrar una conversación eliminada, sin restaurar
+  el historial que el usuario había vaciado.
 
 La calidad está limitada intencionalmente para mantener un alcance académico.
 
@@ -292,7 +304,8 @@ La calidad está limitada intencionalmente para mantener un alcance académico.
 - La videollamada prioriza simplicidad sobre calidad.
 - Los archivos están limitados a 20 MB por defecto.
 - Solo se permite una sesión activa por usuario.
-- Las llamadas de grupo comienzan cuando un miembro acepta.
+- Las invitaciones grupales expiran si el usuario no se une dentro del tiempo
+  configurado.
 
 ## Documentación adicional
 

@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld("chad", {
     deleteMessage: (payload) =>
       ipcRenderer.invoke("chat:delete-message", payload),
     pinMessage: (payload) => ipcRenderer.invoke("chat:pin-message", payload),
+    clear: (payload) => ipcRenderer.invoke("chat:clear", payload),
+    remove: (payload) => ipcRenderer.invoke("chat:remove", payload),
   },
   group: {
     create: (payload) => ipcRenderer.invoke("group:create", payload),

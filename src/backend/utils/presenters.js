@@ -80,11 +80,25 @@ function presentMessage(message) {
   };
 }
 
-function presentCall(call) {
+function presentCall(call, participants = []) {
   if (!call) return null;
+
+  const presentedParticipants = participants.map((participant) => ({
+    ...participant,
+    avatarData: participant.profilePicture
+      ? fileToDataUrl(
+          participant.profilePicture,
+          mimeFromFilePath(participant.profilePicture),
+        )
+      : null,
+  }));
 
   return {
     ...call,
+    participants: presentedParticipants,
+    joinedParticipantIds: presentedParticipants
+      .filter((participant) => participant.status === "joined")
+      .map((participant) => participant.id),
     callerAvatarData: call.callerProfilePicture
       ? fileToDataUrl(
           call.callerProfilePicture,

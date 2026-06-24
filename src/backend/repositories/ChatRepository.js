@@ -71,6 +71,7 @@ class ChatRepository extends BaseRepository {
           END
           FROM messages m
           WHERE m.chat_id = pc.id
+            AND m.id > COALESCE(pcs.cleared_through_message_id, 0)
           ORDER BY m.id DESC
           LIMIT 1
         ) AS lastMessage,
@@ -78,6 +79,7 @@ class ChatRepository extends BaseRepository {
           SELECT m.message_type
           FROM messages m
           WHERE m.chat_id = pc.id
+            AND m.id > COALESCE(pcs.cleared_through_message_id, 0)
           ORDER BY m.id DESC
           LIMIT 1
         ) AS lastMessageType,
@@ -85,6 +87,7 @@ class ChatRepository extends BaseRepository {
           SELECT m.created_at
           FROM messages m
           WHERE m.chat_id = pc.id
+            AND m.id > COALESCE(pcs.cleared_through_message_id, 0)
           ORDER BY m.id DESC
           LIMIT 1
         ) AS lastMessageAt
@@ -94,9 +97,12 @@ class ChatRepository extends BaseRepository {
           WHEN pc.user_one_id = ? THEN pc.user_two_id
           ELSE pc.user_one_id
         END
-      WHERE pc.user_one_id = ? OR pc.user_two_id = ?
+      LEFT JOIN private_chat_states pcs
+        ON pcs.chat_id = pc.id AND pcs.user_id = ?
+      WHERE (pc.user_one_id = ? OR pc.user_two_id = ?)
+        AND COALESCE(pcs.hidden, 0) = 0
       ORDER BY COALESCE(lastMessageAt, pc.created_at) DESC
-    `).all(userId, userId, userId);
+    `).all(userId, userId, userId, userId);
   }
 
   createMessage({
@@ -169,7 +175,12 @@ class ChatRepository extends BaseRepository {
     `).get(messageId);
   }
 
-  listMessages({ chatId = null, groupId = null, limit = 100 }) {
+  listMessages({
+    chatId = null,
+    groupId = null,
+    limit = 100,
+    afterMessageId = 0,
+  }) {
     const contextColumn = chatId ? "m.chat_id" : "m.group_id";
     const contextId = chatId || groupId;
 
@@ -207,12 +218,65 @@ class ChatRepository extends BaseRepository {
         LEFT JOIN files f ON f.id = m.file_id
         LEFT JOIN messages replied ON replied.id = m.reply_to_id
         LEFT JOIN users reply_user ON reply_user.id = replied.sender_id
-        WHERE ${contextColumn} = ?
+        WHERE ${contextColumn} = ? AND m.id > ?
         ORDER BY m.id DESC
         LIMIT ?
       )
       ORDER BY id ASC
-    `).all(contextId, limit);
+    `).all(contextId, afterMessageId, limit);
+  }
+
+  showPrivateChatForUser(chatId, userId) {
+    this.prepare(`
+      INSERT INTO private_chat_states (chat_id, user_id, hidden)
+      VALUES (?, ?, 0)
+      ON CONFLICT(chat_id, user_id) DO UPDATE SET
+        hidden = 0,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(chatId, userId);
+  }
+
+  revealPrivateChatForMembers(chatId) {
+    const memberIds = this.getPrivateChatMemberIds(chatId);
+    for (const userId of memberIds) {
+      this.showPrivateChatForUser(chatId, userId);
+    }
+  }
+
+  getClearedThroughMessageId(chatId, userId) {
+    return (
+      this.prepare(`
+        SELECT cleared_through_message_id AS messageId
+        FROM private_chat_states
+        WHERE chat_id = ? AND user_id = ?
+      `).get(chatId, userId)?.messageId || 0
+    );
+  }
+
+  clearPrivateChatForUser(chatId, userId, hidden = false) {
+    const lastMessageId =
+      this.prepare(`
+        SELECT COALESCE(MAX(id), 0) AS id
+        FROM messages
+        WHERE chat_id = ?
+      `).get(chatId).id || 0;
+
+    this.prepare(`
+      INSERT INTO private_chat_states (
+        chat_id,
+        user_id,
+        cleared_through_message_id,
+        hidden,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(chat_id, user_id) DO UPDATE SET
+        cleared_through_message_id = excluded.cleared_through_message_id,
+        hidden = excluded.hidden,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(chatId, userId, lastMessageId, hidden ? 1 : 0);
+
+    return { chatId, clearedThroughMessageId: lastMessageId, hidden };
   }
 
   softDeleteMessage(messageId) {

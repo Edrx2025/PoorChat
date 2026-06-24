@@ -53,7 +53,30 @@ async function handleAuthenticated(result) {
   $("#app-shell").classList.remove("hidden");
   updateAccountUI();
   switchView("chats");
+  await restoreCallState();
   showToast(`Bienvenido, ${state.currentUser.displayName}`);
+}
+
+async function restoreCallState() {
+  const activeCall = state.calls.find((call) => {
+    if (!["started", "in_progress"].includes(call.status)) return false;
+    return call.participants?.some(
+      (participant) =>
+        participant.id === state.currentUser.id &&
+        ["joined", "invited"].includes(participant.status),
+    );
+  });
+  if (!activeCall) return;
+
+  const currentParticipant = activeCall.participants.find(
+    (participant) => participant.id === state.currentUser.id,
+  );
+  if (currentParticipant.status === "invited") {
+    callController.showIncoming(activeCall);
+    return;
+  }
+
+  await callController.handleCallUpdate(activeCall);
 }
 
 function setupAppEvents() {
@@ -137,6 +160,17 @@ function setupAppEvents() {
         renderCurrentList();
       },
     });
+  });
+  window.addEventListener("chad:chat-cleared", async () => {
+    await refreshBootstrap(false);
+    renderCurrentList();
+  });
+  window.addEventListener("chad:chat-removed", async () => {
+    state.activeContext = null;
+    state.messages = [];
+    $("#app-shell").classList.remove("details-open");
+    await refreshBootstrap(false);
+    switchView("chats");
   });
 }
 

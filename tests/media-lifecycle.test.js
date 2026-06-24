@@ -44,6 +44,13 @@ function createElement(tagName = "div") {
       if (selector === "img") {
         return children.find((child) => child.tagName === "IMG") || null;
       }
+      if (selector === ".participant-video-placeholder") {
+        return (
+          children.find((child) =>
+            child.className?.includes("participant-video-placeholder"),
+          ) || null
+        );
+      }
       return null;
     },
     querySelectorAll(selector) {
@@ -76,6 +83,11 @@ function createElement(tagName = "div") {
       element._innerHTML = value;
       if (String(value).includes("<img")) {
         element.appendChild(createElement("img"));
+      }
+      if (String(value).includes("participant-video-placeholder")) {
+        const placeholder = createElement("div");
+        placeholder.className = "participant-video-placeholder";
+        element.appendChild(placeholder);
       }
     },
   });
@@ -234,6 +246,11 @@ test("la llamada aceptada permanece minimizada hasta que el usuario la abre", as
     callerId: 1,
     receiverId: 2,
     receiverDisplayName: "User Two",
+    participants: [
+      { id: 1, displayName: "User One", status: "joined" },
+      { id: 2, displayName: "User Two", status: "joined" },
+    ],
+    joinedParticipantIds: [1, 2],
   });
 
   assert.equal(
@@ -410,6 +427,65 @@ test("cada participante de una videollamada grupal conserva su propia cámara", 
 
   state.activeCall = null;
   state.groups = [];
+  delete global.document;
+  delete global.window;
+});
+
+test("un invitado grupal no activa medios hasta pulsar unirse", async () => {
+  const elements = new Map();
+  global.document = {
+    querySelector(selector) {
+      if (!elements.has(selector)) elements.set(selector, createElement());
+      return elements.get(selector);
+    },
+    createElement(tagName) {
+      return createElement(tagName);
+    },
+  };
+  global.window = {
+    chad: {
+      media: {
+        onReceived() {},
+      },
+    },
+    addEventListener() {},
+  };
+
+  const [{ CallController }, { state }] = await Promise.all([
+    import("../src/renderer/js/calls.js"),
+    import("../src/renderer/js/state.js"),
+  ]);
+  state.currentUser = { id: 3, displayName: "User Three" };
+  state.activeCall = null;
+  let mediaStarts = 0;
+  const controller = new CallController({ onCallsChanged() {} });
+  controller.ensureMediaStarted = async () => {
+    mediaStarts += 1;
+  };
+
+  await controller.handleCallUpdate({
+    id: 700,
+    groupId: 70,
+    groupName: "Proyecto Final",
+    callType: "video",
+    status: "in_progress",
+    callerId: 1,
+    participants: [
+      { id: 1, displayName: "User One", status: "joined" },
+      { id: 2, displayName: "User Two", status: "joined" },
+      { id: 3, displayName: "User Three", status: "invited" },
+    ],
+    joinedParticipantIds: [1, 2],
+  });
+
+  assert.equal(state.activeCall, null);
+  assert.equal(mediaStarts, 0);
+  assert.equal(controller.incomingCall.id, 700);
+  assert.equal(
+    elements.get("#incoming-call").classList.contains("hidden"),
+    false,
+  );
+
   delete global.document;
   delete global.window;
 });

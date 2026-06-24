@@ -29,7 +29,12 @@ class CallService {
     if (!recipients.length) throw new Error("No hay destinatarios para la llamada");
 
     const saved = this.callRepository.create(call);
-    const presented = presentCall(saved);
+    this.callRepository.createParticipants(
+      saved.id,
+      userId,
+      recipients,
+    );
+    const presented = this.present(saved);
 
     this.userRepository.updateStatus(userId, "in_call");
     this.notificationService.notify("call:incoming", recipients, presented);
@@ -37,15 +42,28 @@ class CallService {
 
     const timeout = setTimeout(() => {
       const current = this.callRepository.findById(saved.id);
-      if (current?.status === "started") {
-        const missed = presentCall(
-          this.callRepository.updateStatus(saved.id, "missed"),
+      if (["started", "in_progress"].includes(current?.status)) {
+        this.callRepository.expireInvitations(saved.id);
+
+        if (current.status === "started") {
+          this.callRepository.updateParticipantStatus(
+            saved.id,
+            userId,
+            "left",
+          );
+          this.callRepository.updateStatus(saved.id, "missed");
+        }
+
+        const updated = this.present(
+          this.callRepository.findById(saved.id),
         );
-        this.userRepository.updateStatus(userId, "online");
+        if (current.status === "started") {
+          this.userRepository.updateStatus(userId, "online");
+        }
         this.notificationService.notify(
           "call:updated",
-          [userId, ...recipients],
-          missed,
+          this.getParticipantIds(current),
+          updated,
         );
       }
       this.timeoutHandles.delete(saved.id);
@@ -56,15 +74,17 @@ class CallService {
   }
 
   accept(userId, callId) {
-    const call = this.assertRecipient(userId, callId);
-    this.clearTimeout(call.id);
+    const call = this.assertInvitedParticipant(userId, callId);
+    this.callRepository.updateParticipantStatus(call.id, userId, "joined");
 
-    const updated = presentCall(
-      this.callRepository.updateStatus(call.id, "in_progress"),
-    );
+    if (call.status === "started") {
+      this.callRepository.updateStatus(call.id, "in_progress");
+    }
+    if (!call.groupId) this.clearTimeout(call.id);
 
     this.userRepository.updateStatus(call.callerId, "in_call");
     this.userRepository.updateStatus(userId, "in_call");
+    const updated = this.present(this.callRepository.findById(call.id));
     this.notificationService.notify(
       "call:updated",
       this.getParticipantIds(call),
@@ -78,13 +98,33 @@ class CallService {
   }
 
   reject(userId, callId) {
-    const call = this.assertRecipient(userId, callId);
-    this.clearTimeout(call.id);
-    const updated = presentCall(
-      this.callRepository.updateStatus(call.id, "rejected"),
-    );
+    const call = this.assertInvitedParticipant(userId, callId);
+    this.callRepository.updateParticipantStatus(call.id, userId, "rejected");
 
-    this.userRepository.updateStatus(call.callerId, "online");
+    if (!call.groupId) {
+      this.clearTimeout(call.id);
+      this.callRepository.updateParticipantStatus(
+        call.id,
+        call.callerId,
+        "left",
+      );
+      this.callRepository.updateStatus(call.id, "rejected");
+      this.userRepository.updateStatus(call.callerId, "online");
+    } else if (
+      call.status === "started" &&
+      this.callRepository.countParticipantsByStatus(call.id, "invited") === 0
+    ) {
+      this.clearTimeout(call.id);
+      this.callRepository.updateParticipantStatus(
+        call.id,
+        call.callerId,
+        "left",
+      );
+      this.callRepository.updateStatus(call.id, "rejected");
+      this.userRepository.updateStatus(call.callerId, "online");
+    }
+
+    const updated = this.present(this.callRepository.findById(call.id));
     this.notificationService.notify(
       "call:updated",
       this.getParticipantIds(call),
@@ -95,19 +135,35 @@ class CallService {
 
   end(userId, callId) {
     const call = this.callRepository.findById(callId);
-    if (!call || !this.getParticipantIds(call).includes(userId)) {
+    const participant = this.callRepository.findParticipant(callId, userId);
+    if (!call || participant?.status !== "joined") {
       throw new Error("No perteneces a esta llamada");
     }
 
-    this.clearTimeout(call.id);
-    const updated = presentCall(
-      this.callRepository.updateStatus(call.id, "ended"),
-    );
+    if (call.groupId) {
+      this.callRepository.updateParticipantStatus(call.id, userId, "left");
+      this.userRepository.updateStatus(userId, "online");
 
-    for (const participantId of this.getParticipantIds(call)) {
-      this.userRepository.updateStatus(participantId, "online");
+      if (
+        this.callRepository.countParticipantsByStatus(call.id, "joined") === 0
+      ) {
+        this.clearTimeout(call.id);
+        this.callRepository.updateStatus(call.id, "ended");
+      }
+    } else {
+      this.clearTimeout(call.id);
+      for (const participantId of this.getParticipantIds(call)) {
+        this.callRepository.updateParticipantStatus(
+          call.id,
+          participantId,
+          "left",
+        );
+        this.userRepository.updateStatus(participantId, "online");
+      }
+      this.callRepository.updateStatus(call.id, "ended");
     }
 
+    const updated = this.present(this.callRepository.findById(call.id));
     this.notificationService.notify(
       "call:updated",
       this.getParticipantIds(call),
@@ -117,14 +173,22 @@ class CallService {
   }
 
   list(userId) {
-    return this.callRepository.listForUser(userId).map(presentCall);
+    return this.callRepository
+      .listForUser(userId)
+      .map((call) => this.present(call));
   }
 
   getRecipientIds(callId, senderId) {
     const call = this.callRepository.findById(callId);
     if (!call || call.status !== "in_progress") return [];
 
-    return this.getParticipantIds(call).filter((id) => id !== senderId);
+    return this.callRepository
+      .listParticipants(callId)
+      .filter(
+        (participant) =>
+          participant.status === "joined" && participant.id !== senderId,
+      )
+      .map((participant) => participant.id);
   }
 
   resolveRecipients(call, callerId) {
@@ -144,20 +208,32 @@ class CallService {
       .filter((id) => id !== callerId);
   }
 
-  assertRecipient(userId, callId) {
+  assertInvitedParticipant(userId, callId) {
     const call = this.callRepository.findById(callId);
-    if (!call || call.status !== "started") {
+    if (!call || !["started", "in_progress"].includes(call.status)) {
       throw new Error("La llamada ya no está disponible");
     }
-    if (!this.getParticipantIds(call).includes(userId) || call.callerId === userId) {
-      throw new Error("No puedes responder esta llamada");
+    const participant = this.callRepository.findParticipant(callId, userId);
+    if (participant?.status !== "invited") {
+      throw new Error("Ya respondiste o no fuiste invitado a esta llamada");
     }
     return call;
   }
 
   getParticipantIds(call) {
+    const participants = this.callRepository.listParticipants(call.id);
+    if (participants.length) {
+      return participants.map((participant) => participant.id);
+    }
     if (call.receiverId) return [call.callerId, call.receiverId];
     return this.groupRepository.getMemberIds(call.groupId);
+  }
+
+  present(call) {
+    return presentCall(
+      call,
+      this.callRepository.listParticipants(call.id),
+    );
   }
 
   clearTimeout(callId) {
