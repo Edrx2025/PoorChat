@@ -23,6 +23,17 @@ CREATE TABLE IF NOT EXISTS private_chats (
   FOREIGN KEY(user_two_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS private_chat_states (
+  chat_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  cleared_through_message_id INTEGER NOT NULL DEFAULT 0,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(chat_id, user_id),
+  FOREIGN KEY(chat_id) REFERENCES private_chats(id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS "groups" (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -102,6 +113,18 @@ CREATE TABLE IF NOT EXISTS calls (
   CHECK((receiver_id IS NOT NULL AND group_id IS NULL) OR (receiver_id IS NULL AND group_id IS NOT NULL))
 );
 
+CREATE TABLE IF NOT EXISTS call_participants (
+  call_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'invited',
+  joined_at TEXT,
+  left_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(call_id, user_id),
+  FOREIGN KEY(call_id) REFERENCES calls(id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL UNIQUE,
@@ -118,4 +141,6 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_calls_receiver ON calls(receiver_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_call_participants_status
+  ON call_participants(call_id, status);
 CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);

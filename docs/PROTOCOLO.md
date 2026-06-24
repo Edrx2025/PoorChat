@@ -52,6 +52,8 @@ Evento:
 - `chat:send`
 - `chat:delete-message`
 - `chat:pin-message`
+- `chat:clear`
+- `chat:remove`
 - `group:create`
 - `group:update`
 - `file:upload-start`
@@ -113,3 +115,16 @@ Chunk de media:
 
 Los chunks son de aproximadamente 700 bytes antes de Base64 para evitar
 fragmentación IP excesiva.
+
+## Participantes de llamadas grupales
+
+Cada llamada incluye una colección `participants`. Cada elemento mantiene un
+estado independiente:
+
+- `invited`: recibió la invitación, pero todavía no participa.
+- `joined`: aceptó o pulsó `Unirse`; puede enviar y recibir UDP.
+- `rejected`: rechazó la invitación.
+- `missed`: no respondió antes del tiempo límite.
+- `left`: salió de la llamada.
+
+El relay UDP envía medios únicamente a usuarios con estado `joined`.

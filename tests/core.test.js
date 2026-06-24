@@ -169,6 +169,68 @@ test("chat privado y persistencia de mensajes", () => {
   assert.ok(history.some((item) => item.id === message.id));
 });
 
+test("vaciar y eliminar chat son acciones locales del usuario", () => {
+  const user1 = userRepository.findByUsername("user1");
+  const tester = userRepository.findByUsername("tester_updated");
+  const chat = chatService.openPrivateChat(user1.id, tester.id);
+  chatService.sendText(user1.id, {
+    contextType: "private",
+    contextId: chat.id,
+    content: "Historial anterior al vaciado",
+  });
+
+  chatService.clearPrivateChat(tester.id, chat.id);
+  const clearedHistory = chatService.getMessages(tester.id, {
+    contextType: "private",
+    contextId: chat.id,
+  });
+  const otherUserHistory = chatService.getMessages(user1.id, {
+    contextType: "private",
+    contextId: chat.id,
+  });
+  assert.equal(clearedHistory.length, 0);
+  assert.ok(
+    otherUserHistory.some(
+      (message) => message.content === "Historial anterior al vaciado",
+    ),
+  );
+
+  const newMessage = chatService.sendText(user1.id, {
+    contextType: "private",
+    contextId: chat.id,
+    content: "Mensaje posterior al vaciado",
+  });
+  assert.deepEqual(
+    chatService
+      .getMessages(tester.id, {
+        contextType: "private",
+        contextId: chat.id,
+      })
+      .map((message) => message.id),
+    [newMessage.id],
+  );
+
+  chatService.removePrivateChat(tester.id, chat.id);
+  assert.equal(
+    chatService
+      .listPrivateChats(tester.id)
+      .some((listedChat) => listedChat.id === chat.id),
+    false,
+  );
+
+  chatService.sendText(user1.id, {
+    contextType: "private",
+    contextId: chat.id,
+    content: "Mensaje que vuelve a mostrar el chat",
+  });
+  assert.equal(
+    chatService
+      .listPrivateChats(tester.id)
+      .some((listedChat) => listedChat.id === chat.id),
+    true,
+  );
+});
+
 test("respuestas, mensajes fijados y borrado lógico", () => {
   const user1 = userRepository.findByUsername("user1");
   const tester = userRepository.findByUsername("tester_updated");
@@ -308,6 +370,58 @@ test("llamadas aceptadas y rechazadas quedan registradas", () => {
   });
   const rejected = callService.reject(user2.id, video.id);
   assert.equal(rejected.status, "rejected");
+});
+
+test("cada integrante decide si se une a una llamada grupal", () => {
+  const user1 = userRepository.findByUsername("user1");
+  const user2 = userRepository.findByUsername("user2");
+  const user3 = userRepository.findByUsername("user3");
+  const group = groupService.create(user1.id, {
+    name: "Llamada independiente",
+    description: "Prueba de participantes",
+    memberIds: [user2.id, user3.id],
+  });
+
+  const started = callService.start(user1.id, {
+    callType: "video",
+    groupId: group.id,
+  });
+  assert.deepEqual(started.joinedParticipantIds, [user1.id]);
+  assert.equal(
+    started.participants.find((participant) => participant.id === user2.id)
+      .status,
+    "invited",
+  );
+
+  const firstJoined = callService.accept(user2.id, started.id);
+  assert.deepEqual(
+    new Set(firstJoined.joinedParticipantIds),
+    new Set([user1.id, user2.id]),
+  );
+  assert.equal(
+    firstJoined.participants.find(
+      (participant) => participant.id === user3.id,
+    ).status,
+    "invited",
+  );
+  assert.deepEqual(
+    new Set(callService.getRecipientIds(started.id, user1.id)),
+    new Set([user2.id]),
+  );
+
+  const secondJoined = callService.accept(user3.id, started.id);
+  assert.deepEqual(
+    new Set(secondJoined.joinedParticipantIds),
+    new Set([user1.id, user2.id, user3.id]),
+  );
+
+  const afterUserTwoLeaves = callService.end(user2.id, started.id);
+  assert.equal(afterUserTwoLeaves.status, "in_progress");
+  assert.equal(afterUserTwoLeaves.joinedParticipantIds.includes(user2.id), false);
+
+  callService.end(user3.id, started.id);
+  const ended = callService.end(user1.id, started.id);
+  assert.equal(ended.status, "ended");
 });
 
 test("modo claro y preferencias persisten", () => {

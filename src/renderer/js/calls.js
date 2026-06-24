@@ -80,9 +80,18 @@ export class CallController {
       avatarData: call.callerAvatarData,
     };
     setAvatar($("#incoming-avatar"), caller);
-    $("#incoming-type").textContent =
-      call.callType === "video" ? "Videollamada entrante" : "Llamada entrante";
+    const inProgress = call.status === "in_progress";
+    $("#incoming-type").textContent = call.groupId
+      ? `${call.callType === "video" ? "Videollamada" : "Llamada"} grupal ${
+          inProgress ? "en curso" : "entrante"
+        }`
+      : call.callType === "video"
+        ? "Videollamada entrante"
+        : "Llamada entrante";
     $("#incoming-name").textContent = call.groupName || call.callerDisplayName;
+    $("#incoming-accept-label").textContent = call.groupId
+      ? "Unirse"
+      : "Aceptar";
     $("#incoming-call").classList.remove("hidden");
   }
 
@@ -128,7 +137,13 @@ export class CallController {
       ...state.calls.filter((existing) => existing.id !== call.id),
     ];
 
-    if (call.status === "in_progress") {
+    const participant = call.participants?.find(
+      (item) => item.id === state.currentUser.id,
+    );
+    const joined = participant?.status === "joined";
+    const activeStatus = ["started", "in_progress"].includes(call.status);
+
+    if (joined && call.status === "in_progress") {
       state.activeCall = call;
       this.updateCallUI(call, "En curso");
       this.showCallIndicator();
@@ -137,10 +152,22 @@ export class CallController {
         $("#incoming-call").classList.add("hidden");
       }
       await this.ensureMediaStarted(call);
-    } else if (call.status === "started" && call.callerId === state.currentUser.id) {
+    } else if (
+      joined &&
+      call.status === "started" &&
+      call.callerId === state.currentUser.id
+    ) {
       state.activeCall = call;
       this.updateCallUI(call, "Llamando");
       this.showCallIndicator();
+    } else if (!joined && activeStatus) {
+      if (state.activeCall?.id === call.id) this.closeCallOverlay();
+      if (participant?.status === "invited") {
+        this.showIncoming(call);
+      } else if (this.incomingCall?.id === call.id) {
+        this.incomingCall = null;
+        $("#incoming-call").classList.add("hidden");
+      }
     } else if (["ended", "rejected", "missed"].includes(call.status)) {
       if (state.activeCall?.id === call.id) this.closeCallOverlay();
       if (this.incomingCall?.id === call.id) {
@@ -174,10 +201,12 @@ export class CallController {
     $("#active-call-icon").innerHTML =
       `<i data-lucide="${isVideo ? "video" : "phone"}"></i>`;
     setAvatar($("#call-avatar"), otherAvatar);
+    setAvatar($("#local-call-avatar"), state.currentUser);
     $("#audio-call-visual").classList.toggle("hidden", isVideo);
     $("#video-call-grid").classList.toggle("hidden", !isVideo);
     $("#toggle-camera").classList.toggle("hidden", !isVideo);
-    if (isVideo) this.updateVideoGridLayout();
+    this.renderCallParticipants(call);
+    if (isVideo) this.syncVideoParticipants(call);
     renderIcons();
   }
 
@@ -250,6 +279,10 @@ export class CallController {
 
       this.stream = acquiredStream;
       $("#local-video").srcObject = acquiredStream;
+      if (call.callType === "video") {
+        $("#local-video").classList.remove("hidden");
+        $("#local-video-placeholder").classList.add("hidden");
+      }
 
       await this.startAudioTransmission(call.id);
       if (call.callType === "video") this.startVideoTransmission(call.id);
@@ -404,7 +437,11 @@ export class CallController {
 
   getRemoteVideoFrame(senderId) {
     const existing = this.remoteVideoTiles.get(senderId);
-    if (existing) return existing.frame;
+    if (existing) {
+      existing.frame.classList.remove("hidden");
+      existing.placeholder.classList.add("hidden");
+      return existing.frame;
+    }
 
     const participant = this.findParticipant(senderId);
     const tile = document.createElement("article");
@@ -412,24 +449,102 @@ export class CallController {
     tile.dataset.senderId = String(senderId);
     tile.innerHTML = `
       <img
-        class="participant-video"
+        class="participant-video hidden"
         alt="Cámara de ${escapeHtml(participant.displayName)}"
       />
+      <div class="participant-video-placeholder">
+        ${avatarMarkup(participant, "avatar avatar-xl")}
+      </div>
       <span class="video-participant-name">
         ${escapeHtml(participant.displayName)}
       </span>
     `;
     const frame = tile.querySelector("img");
+    const placeholder = tile.querySelector(".participant-video-placeholder");
     $("#video-call-grid").appendChild(tile);
-    this.remoteVideoTiles.set(senderId, { tile, frame });
+    this.remoteVideoTiles.set(senderId, { tile, frame, placeholder });
+    frame.classList.remove("hidden");
+    placeholder.classList.add("hidden");
     this.updateVideoGridLayout();
     return frame;
+  }
+
+  ensureRemoteVideoTile(participant) {
+    if (this.remoteVideoTiles.has(participant.id)) return;
+
+    const tile = document.createElement("article");
+    tile.className = "video-tile remote";
+    tile.dataset.senderId = String(participant.id);
+    tile.innerHTML = `
+      <img
+        class="participant-video hidden"
+        alt="Cámara de ${escapeHtml(participant.displayName)}"
+      />
+      <div class="participant-video-placeholder">
+        ${avatarMarkup(participant, "avatar avatar-xl")}
+      </div>
+      <span class="video-participant-name">
+        ${escapeHtml(participant.displayName)}
+      </span>
+    `;
+    $("#video-call-grid").appendChild(tile);
+    this.remoteVideoTiles.set(participant.id, {
+      tile,
+      frame: tile.querySelector("img"),
+      placeholder: tile.querySelector(".participant-video-placeholder"),
+    });
+  }
+
+  syncVideoParticipants(call) {
+    const joined = (call.participants || []).filter(
+      (participant) =>
+        participant.status === "joined" &&
+        participant.id !== state.currentUser.id,
+    );
+    const joinedIds = new Set(joined.map((participant) => participant.id));
+
+    for (const participant of joined) {
+      this.ensureRemoteVideoTile(participant);
+    }
+    for (const [userId, entry] of this.remoteVideoTiles) {
+      if (!joinedIds.has(userId)) {
+        entry.tile.remove();
+        this.remoteVideoTiles.delete(userId);
+      }
+    }
+    this.updateVideoGridLayout();
+  }
+
+  renderCallParticipants(call) {
+    const joined = (call.participants || []).filter(
+      (participant) => participant.status === "joined",
+    );
+    const container = $("#call-participants");
+    container.innerHTML = joined
+      .map(
+        (participant) => `
+          <div class="call-participant">
+            ${avatarMarkup(participant, "avatar avatar-sm")}
+            <span>${escapeHtml(
+              participant.id === state.currentUser.id
+                ? "Tú"
+                : participant.displayName,
+            )}</span>
+          </div>
+        `,
+      )
+      .join("");
+    container.classList.toggle("hidden", !joined.length);
   }
 
   findParticipant(senderId) {
     if (state.currentUser?.id === senderId) return state.currentUser;
 
     if (state.activeCall?.groupId) {
+      const activeParticipant = state.activeCall.participants?.find(
+        (participant) => participant.id === senderId,
+      );
+      if (activeParticipant) return activeParticipant;
       const group = state.groups.find(
         (item) => item.id === state.activeCall.groupId,
       );
@@ -485,7 +600,12 @@ export class CallController {
       kind === "audio" ? $("#toggle-microphone") : $("#toggle-camera");
 
     for (const track of tracks) track.enabled = !track.enabled;
-    button.classList.toggle("disabled", tracks.some((track) => !track.enabled));
+    const disabled = tracks.some((track) => !track.enabled);
+    button.classList.toggle("disabled", disabled);
+    if (kind === "video") {
+      $("#local-video").classList.toggle("hidden", disabled);
+      $("#local-video-placeholder").classList.toggle("hidden", !disabled);
+    }
   }
 
   closeCallOverlay() {
@@ -538,6 +658,8 @@ export class CallController {
     if (localVideo) {
       localVideo.pause();
       localVideo.srcObject = null;
+      localVideo.classList.add("hidden");
+      $("#local-video-placeholder")?.classList.remove("hidden");
     }
   }
 

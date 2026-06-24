@@ -12,6 +12,8 @@ export const api = {
     window.chad.chat.deleteMessage({ messageId }),
   pinMessage: (messageId, pinned) =>
     window.chad.chat.pinMessage({ messageId, pinned }),
+  clearChat: (chatId) => window.chad.chat.clear({ chatId }),
+  removeChat: (chatId) => window.chad.chat.remove({ chatId }),
   createGroup: (payload) => window.chad.group.create(payload),
   updateGroup: (payload) => window.chad.group.update(payload),
   uploadFile: (contextType, contextId, replyToId = null) =>
