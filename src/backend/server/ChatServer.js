@@ -158,6 +158,8 @@ class ChatServer {
         return this.chatService.openPrivateChat(user.id, Number(payload.targetUserId));
       case MessageTypes.CHAT_MESSAGES:
         return this.chatService.getMessages(user.id, payload);
+      case MessageTypes.CHAT_SYNC:
+        return this.chatService.syncMessages(user.id, payload);
       case MessageTypes.CHAT_SEND:
         return this.chatService.sendText(user.id, payload);
       case MessageTypes.CHAT_DELETE:
@@ -211,6 +213,8 @@ class ChatServer {
         return this.fileService.list(user.id, payload);
       case MessageTypes.FILE_DOWNLOAD:
         return this.fileService.download(user.id, Number(payload.fileId));
+      case MessageTypes.FILE_PREVIEW:
+        return this.fileService.preview(user.id, Number(payload.fileId));
       case MessageTypes.CALL_START:
         return this.callService.start(user.id, payload);
       case MessageTypes.CALL_ACCEPT:

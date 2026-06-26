@@ -9,6 +9,8 @@ export const state = {
   activeView: "chats",
   activeContext: null,
   messages: [],
+  loadingOlderMessages: false,
+  hasMoreMessages: true,
   replyingTo: null,
   activeCall: null,
 };
@@ -33,6 +35,8 @@ export function resetState() {
   state.activeView = "chats";
   state.activeContext = null;
   state.messages = [];
+  state.loadingOlderMessages = false;
+  state.hasMoreMessages = true;
   state.replyingTo = null;
   state.activeCall = null;
 }

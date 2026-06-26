@@ -21,6 +21,7 @@ import {
   renderDetails,
   renderGroupCallBanner,
   renderMessages,
+  loadOlderMessages,
   sendCurrentMessage,
   toggleVoiceRecording,
   uploadCurrentFile,
@@ -133,6 +134,9 @@ function setupAppEvents() {
     event.target.style.height = "auto";
     event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`;
   });
+  $("#messages-container").addEventListener("scroll", (event) => {
+    if (event.currentTarget.scrollTop <= 80) loadOlderMessages();
+  });
   $("#attach-button").addEventListener("click", uploadCurrentFile);
   $("#voice-record-button").addEventListener("click", toggleVoiceRecording);
   $("#cancel-composer-context").addEventListener("click", cancelReply);
@@ -193,18 +197,20 @@ function setupAppEvents() {
 function setupServerEvents() {
   window.chad.events.onServerEvent(async (message) => {
     switch (message.event) {
-      case "message:new":
+      case "message:new": {
+        const knownConversation = updateConversationSummary(message.data);
         if (!appendMessage(message.data)) {
           showToast(
             `Nuevo mensaje de ${message.data.senderDisplayName || "Chad"}`,
           );
         }
-        await refreshBootstrap(false);
+        if (!knownConversation) await refreshBootstrap(false);
         renderCurrentList();
         break;
+      }
       case "message:updated":
+        updateConversationSummary(message.data, { onlyIfLatest: true });
         updateMessage(message.data);
-        await refreshBootstrap(false);
         renderCurrentList();
         break;
       case "group:created":
@@ -485,8 +491,45 @@ function syncActiveGroupContext() {
 function closeActiveConversation() {
   state.activeContext = null;
   state.messages = [];
+  state.loadingOlderMessages = false;
+  state.hasMoreMessages = true;
   $("#conversation-view").classList.add("hidden");
   $("#app-shell").classList.remove("details-open");
+}
+
+function updateConversationSummary(message, { onlyIfLatest = false } = {}) {
+  const summary = message.deleted
+    ? "Mensaje borrado"
+    : message.content ||
+      message.file?.originalName ||
+      {
+        image: "Imagen",
+        audio: "Nota de voz",
+        video: "Video",
+        document: "Documento",
+      }[message.messageType] ||
+      "Mensaje";
+  const collection =
+    message.chatId ? state.privateChats : message.groupId ? state.groups : [];
+  const item = collection.find(
+    (candidate) =>
+      candidate.id === Number(message.chatId || message.groupId),
+  );
+  if (!item) return false;
+  if (onlyIfLatest && Number(item.lastMessageId) !== Number(message.id)) {
+    return true;
+  }
+
+  item.lastMessageId = message.id;
+  item.lastMessage = summary;
+  item.lastMessageType = message.messageType;
+  item.lastMessageAt = message.createdAt;
+  collection.sort(
+    (first, second) =>
+      new Date(second.lastMessageAt || second.createdAt || 0) -
+      new Date(first.lastMessageAt || first.createdAt || 0),
+  );
+  return true;
 }
 
 function updateAccountUI() {

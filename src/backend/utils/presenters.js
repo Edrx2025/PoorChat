@@ -1,5 +1,4 @@
 const path = require("path");
-const fs = require("fs");
 const { fileToDataUrl } = require("./fileUtils");
 
 function mimeFromFilePath(filePath) {
@@ -30,53 +29,48 @@ function publicUser(user) {
 function presentMessage(message) {
   if (!message) return null;
 
-  const deleted = Boolean(message.deletedAt);
-  let filePreviewData = null;
-  if (
-    !deleted &&
-    message.filePath &&
-    message.fileSize <= 8 * 1024 * 1024 &&
-    ["image", "audio", "video"].includes(message.fileType) &&
-    fs.existsSync(message.filePath)
-  ) {
-    filePreviewData = fileToDataUrl(
-      message.filePath,
-      message.fileMimeType || "application/octet-stream",
-    );
-  }
+  const {
+    senderProfilePicture,
+    filePath,
+    fileOriginalName,
+    fileType,
+    fileMimeType,
+    fileSize,
+    replyContent,
+    replyMessageType,
+    replyDeletedAt,
+    replySenderDisplayName,
+    ...messageData
+  } = message;
+  const deleted = Boolean(messageData.deletedAt);
 
   return {
-    ...message,
-    content: deleted ? "" : message.content,
-    isPinned: Boolean(message.isPinned),
+    ...messageData,
+    content: deleted ? "" : messageData.content,
+    isPinned: Boolean(messageData.isPinned),
     deleted,
-    deletedBy: message.deletedBy || null,
-    deletionReason: message.deletionReason || null,
-    senderAvatarData: message.senderProfilePicture
-      ? fileToDataUrl(
-          message.senderProfilePicture,
-          mimeFromFilePath(message.senderProfilePicture),
-        )
-      : null,
-    file: !deleted && message.fileId
+    deletedBy: messageData.deletedBy || null,
+    deletionReason: messageData.deletionReason || null,
+    senderAvatarData: null,
+    file: !deleted && messageData.fileId
       ? {
-          id: message.fileId,
-          originalName: message.fileOriginalName,
-          fileType: message.fileType,
-          mimeType: message.fileMimeType,
-          size: message.fileSize,
-          previewData: filePreviewData,
+          id: messageData.fileId,
+          originalName: fileOriginalName,
+          fileType,
+          mimeType: fileMimeType,
+          size: fileSize,
+          previewData: null,
         }
       : null,
-    reply: message.replyToId
+    reply: messageData.replyToId
       ? {
-          id: message.replyToId,
-          senderDisplayName: message.replySenderDisplayName,
-          content: message.replyDeletedAt
+          id: messageData.replyToId,
+          senderDisplayName: replySenderDisplayName,
+          content: replyDeletedAt
             ? "Mensaje borrado"
-            : message.replyContent,
-          messageType: message.replyMessageType,
-          deleted: Boolean(message.replyDeletedAt),
+            : replyContent,
+          messageType: replyMessageType,
+          deleted: Boolean(replyDeletedAt),
         }
       : null,
   };

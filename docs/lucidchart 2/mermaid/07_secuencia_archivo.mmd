@@ -1,0 +1,31 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+sequenceDiagram
+  actor U as Usuario
+  participant R as Renderer
+  participant M as Electron Main
+  participant S as ChatServer
+  participant FS as FileService
+  participant FR as FileRepository
+  participant ST as Storage
+  participant DB as SQLite
+
+  U->>R: Selecciona documento, imagen, audio o video
+  R->>M: file:choose-and-upload
+  M->>S: file:upload-start (metadatos)
+  S->>FS: beginUpload()
+  FS->>FS: valida acceso y límite de 20 MB
+  FS-->>M: transferId
+  loop bloques TCP de 64 KB
+    M->>S: file:upload-chunk (Base64)
+    S->>FS: appendChunk()
+    FS-->>M: progreso
+  end
+  M->>S: file:upload-end
+  S->>FS: finishUpload()
+  FS->>FS: concatena y valida tamaño
+  FS->>ST: guarda archivo con nombre único
+  FS->>FR: create(metadata)
+  FR->>DB: INSERT files
+  FS->>DB: INSERT message con file_id
+  S-->>R: archivo + mensaje
+  Note over R,DB: La transferencia usa chunks, pero la reconstrucción actual se realiza en memoria.

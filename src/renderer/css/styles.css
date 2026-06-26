@@ -740,6 +740,35 @@ select:focus-visible {
   scroll-behavior: smooth;
 }
 
+.load-file-preview {
+  width: 100%;
+  min-height: 76px;
+  margin-bottom: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  border: 1px dashed color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 6px;
+}
+
+.load-file-preview:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.load-file-preview:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.load-file-preview svg {
+  width: 17px;
+  height: 17px;
+}
+
 .pinned-messages {
   grid-row: 3;
   min-height: 42px;

@@ -1,0 +1,24 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+stateDiagram-v2
+  [*] --> invited: servidor crea invitación
+  invited --> joined: aceptar o Unirse
+  invited --> rejected: rechazar
+  invited --> missed: expira el tiempo
+  rejected --> joined: Unirse mientras la llamada siga activa
+  missed --> joined: Unirse desde la barra persistente
+  joined --> left: salir de la llamada
+  left --> joined: volver a Unirse
+  rejected --> [*]: llamada finalizada
+  missed --> [*]: llamada finalizada
+  left --> [*]: llamada finalizada
+
+  state "Estado global de la llamada" as global {
+    [*] --> started
+    started --> in_progress: primer invitado se une
+    started --> missed: nadie responde
+    started --> rejected: todos rechazan
+    in_progress --> ended: no quedan joined
+    missed --> [*]
+    rejected --> [*]
+    ended --> [*]
+  }

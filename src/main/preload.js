@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld("chad", {
     open: (payload) => ipcRenderer.invoke("chat:open", payload),
     getMessages: (payload) =>
       ipcRenderer.invoke("chat:get-messages", payload),
+    getCachedMessages: (payload) =>
+      ipcRenderer.invoke("chat:get-cached-messages", payload),
+    syncMessages: (payload) =>
+      ipcRenderer.invoke("chat:sync-messages", payload),
+    loadOlder: (payload) => ipcRenderer.invoke("chat:load-older", payload),
     send: (payload) => ipcRenderer.invoke("chat:send", payload),
     deleteMessage: (payload) =>
       ipcRenderer.invoke("chat:delete-message", payload),
@@ -41,6 +46,7 @@ contextBridge.exposeInMainWorld("chad", {
     uploadRecordedAudio: (payload) =>
       ipcRenderer.invoke("file:upload-recorded-audio", payload),
     list: (payload) => ipcRenderer.invoke("file:list", payload),
+    getPreview: (payload) => ipcRenderer.invoke("file:get-preview", payload),
     download: (payload) => ipcRenderer.invoke("file:download", payload),
     onProgress: (callback) => on("file:progress", callback),
   },

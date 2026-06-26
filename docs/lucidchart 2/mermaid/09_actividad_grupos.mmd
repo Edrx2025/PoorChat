@@ -1,0 +1,35 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+flowchart TD
+  START((Inicio))
+  ACTION{"Acción solicitada"}
+  MEMBER["Miembro envía mensaje,<br/>archivo o sale del grupo"]
+  MOD{"¿Rol owner/admin?"}
+  EDIT["Editar datos o agregar miembros"]
+  PROMOTE["Promover miembro a admin"]
+  KICK{"¿Objetivo es el dueño?"}
+  REMOVE["Expulsar integrante"]
+  DELETE["Eliminar mensaje propio o ajeno"]
+  CLEAR["Vaciar historial grupal"]
+  REJECT["Servidor rechaza la acción"]
+  SYSTEM["Crear mensaje de sistema<br/>y notificar al grupo"]
+  OWNERLEAVE{"¿Sale el dueño?"}
+  SUCCESSOR["Transferir propiedad al admin<br/>o miembro más antiguo"]
+  REMOVESELF["Eliminar membresía"]
+  END((Fin))
+
+  START --> ACTION
+  ACTION -->|"uso normal"| MEMBER
+  ACTION -->|"administración"| MOD
+  MOD -->|No| REJECT --> END
+  MOD -->|Sí| EDIT --> SYSTEM
+  MOD -->|Sí| PROMOTE --> SYSTEM
+  MOD -->|Sí| KICK
+  KICK -->|Sí| REJECT
+  KICK -->|No| REMOVE --> SYSTEM
+  MOD -->|Sí| DELETE --> END
+  MOD -->|Sí| CLEAR --> END
+  MEMBER -->|"salir"| OWNERLEAVE
+  OWNERLEAVE -->|Sí| SUCCESSOR --> REMOVESELF --> SYSTEM
+  OWNERLEAVE -->|No| REMOVESELF
+  MEMBER -->|"mensaje o archivo"| END
+  SYSTEM --> END

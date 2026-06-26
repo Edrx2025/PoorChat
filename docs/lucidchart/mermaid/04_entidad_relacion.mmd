@@ -1,0 +1,99 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+erDiagram
+  USERS ||--o{ PRIVATE_CHATS : participa
+  USERS ||--o{ PRIVATE_CHAT_STATES : personaliza
+  PRIVATE_CHATS ||--o{ PRIVATE_CHAT_STATES : conserva
+  USERS ||--o{ GROUPS : crea
+  USERS ||--o{ GROUP_MEMBERS : integra
+  GROUPS ||--o{ GROUP_MEMBERS : contiene
+  USERS ||--o{ MESSAGES : envia
+  PRIVATE_CHATS ||--o{ MESSAGES : recibe
+  GROUPS ||--o{ MESSAGES : recibe
+  USERS ||--o{ FILES : sube
+  PRIVATE_CHATS ||--o{ FILES : adjunta
+  GROUPS ||--o{ FILES : adjunta
+  FILES o|--o| MESSAGES : representa
+  MESSAGES o|--o{ MESSAGES : responde
+  USERS ||--o{ CALLS : inicia
+  GROUPS o|--o{ CALLS : aloja
+  CALLS ||--o{ CALL_PARTICIPANTS : registra
+  USERS ||--o{ CALL_PARTICIPANTS : participa
+  USERS ||--|| SETTINGS : configura
+
+  USERS {
+    integer id PK
+    text username UK
+    text display_name
+    text password_hash
+    text profile_picture
+    text status
+    text theme
+  }
+  PRIVATE_CHATS {
+    integer id PK
+    integer user_one_id FK
+    integer user_two_id FK
+    text created_at
+  }
+  PRIVATE_CHAT_STATES {
+    integer chat_id PK,FK
+    integer user_id PK,FK
+    integer cleared_through_message_id
+    integer hidden
+  }
+  GROUPS {
+    integer id PK
+    text name
+    text description
+    integer created_by FK
+  }
+  GROUP_MEMBERS {
+    integer id PK
+    integer group_id FK
+    integer user_id FK
+    text role
+  }
+  MESSAGES {
+    integer id PK
+    integer chat_id FK
+    integer group_id FK
+    integer sender_id FK
+    text message_type
+    integer file_id FK
+    integer reply_to_id FK
+    integer is_pinned
+    text deletion_reason
+  }
+  FILES {
+    integer id PK
+    text original_name
+    text stored_name UK
+    text file_path
+    text file_type
+    text mime_type
+    integer size
+  }
+  CALLS {
+    integer id PK
+    text call_type
+    integer caller_id FK
+    integer receiver_id FK
+    integer group_id FK
+    text status
+  }
+  CALL_PARTICIPANTS {
+    integer call_id PK,FK
+    integer user_id PK,FK
+    text status
+    text joined_at
+    text left_at
+  }
+  SETTINGS {
+    integer id PK
+    integer user_id UK,FK
+    text theme
+    integer notifications_enabled
+    integer call_notifications_enabled
+    integer sound_enabled
+    text accent_color
+  }

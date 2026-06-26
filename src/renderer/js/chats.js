@@ -122,7 +122,9 @@ export async function openConversation(item) {
     avatar: item.avatar,
     source: item.source,
   };
-  state.messages = await api.getMessages(item.contextType, item.contextId);
+  state.messages = [];
+  state.loadingOlderMessages = false;
+  state.hasMoreMessages = false;
 
   $("#empty-state").classList.add("hidden");
   $("#calls-view").classList.add("hidden");
@@ -142,9 +144,40 @@ export async function openConversation(item) {
       `${item.source.members?.length || 0} integrantes`;
   }
 
+  const contextSnapshot = `${item.contextType}:${item.contextId}`;
+  try {
+    const cachedMessages = await api.getCachedMessages(
+      item.contextType,
+      item.contextId,
+    );
+    if (!isActiveContext(contextSnapshot)) return;
+    state.messages = cachedMessages;
+  } catch {
+    if (!isActiveContext(contextSnapshot)) return;
+    state.messages = [];
+  }
   renderMessages();
   renderGroupCallBanner();
   renderDetails();
+
+  try {
+    const synchronized = await api.syncMessages(
+      item.contextType,
+      item.contextId,
+    );
+    if (!isActiveContext(contextSnapshot)) return;
+    state.messages = synchronized;
+    state.hasMoreMessages = synchronized.length >= 100;
+    renderMessages();
+  } catch (error) {
+    if (!isActiveContext(contextSnapshot)) return;
+    state.hasMoreMessages = state.messages.length >= 100;
+    if (state.messages.length) {
+      showToast("Mostrando mensajes guardados localmente");
+    } else {
+      showToast(error.message, "error");
+    }
+  }
 }
 
 export function renderGroupCallBanner() {
@@ -210,7 +243,7 @@ export function renderGroupCallBanner() {
   renderIcons();
 }
 
-export function renderMessages() {
+export function renderMessages({ scrollToBottom = true } = {}) {
   const container = $("#messages-container");
   renderPinnedMessages();
 
@@ -221,7 +254,7 @@ export function renderMessages() {
   }
 
   container.innerHTML = state.messages.map(messageMarkup).join("");
-  container.scrollTop = container.scrollHeight;
+  if (scrollToBottom) container.scrollTop = container.scrollHeight;
   renderIcons();
 
   container.querySelectorAll("[data-download-file]").forEach((button) => {
@@ -251,6 +284,59 @@ export function renderMessages() {
       scrollToMessage(Number(button.dataset.replyTarget)),
     );
   });
+
+  container.querySelectorAll("[data-load-preview]").forEach((button) => {
+    button.addEventListener("click", () =>
+      loadFilePreview(Number(button.dataset.loadPreview), button),
+    );
+  });
+}
+
+export async function loadOlderMessages() {
+  if (
+    !state.activeContext ||
+    !state.messages.length ||
+    state.loadingOlderMessages ||
+    !state.hasMoreMessages
+  ) {
+    return;
+  }
+
+  const contextSnapshot =
+    `${state.activeContext.type}:${state.activeContext.id}`;
+  const oldestMessageId = state.messages[0].id;
+  const container = $("#messages-container");
+  const previousHeight = container.scrollHeight;
+  const previousTop = container.scrollTop;
+  state.loadingOlderMessages = true;
+
+  try {
+    const older = await api.loadOlderMessages(
+      state.activeContext.type,
+      state.activeContext.id,
+      oldestMessageId,
+    );
+    if (!isActiveContext(contextSnapshot)) return;
+
+    const knownIds = new Set(state.messages.map((message) => message.id));
+    const newMessages = older.filter((message) => !knownIds.has(message.id));
+    state.hasMoreMessages = older.length >= 100;
+    if (!newMessages.length) {
+      state.hasMoreMessages = false;
+      return;
+    }
+
+    state.messages = [...newMessages, ...state.messages].sort(
+      (first, second) => first.id - second.id,
+    );
+    renderMessages({ scrollToBottom: false });
+    container.scrollTop =
+      container.scrollHeight - previousHeight + previousTop;
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    state.loadingOlderMessages = false;
+  }
 }
 
 export function appendMessage(message) {
@@ -718,6 +804,10 @@ function messageMarkup(message) {
   }
 
   const own = message.senderId === state.currentUser.id;
+  const sender =
+    own
+      ? state.currentUser
+      : state.users.find((user) => user.id === message.senderId);
   const deleted = message.deleted || message.messageType === "deleted";
   const currentRole =
     state.activeContext?.type === "group"
@@ -796,7 +886,7 @@ function messageMarkup(message) {
       ${own ? "" : avatarMarkup(
         {
           displayName: message.senderDisplayName,
-          avatarData: message.senderAvatarData,
+          avatarData: message.senderAvatarData || sender?.avatarData,
         },
         "avatar message-avatar",
       )}
@@ -982,19 +1072,52 @@ async function blobToBase64(blob) {
 }
 
 function previewMarkup(file) {
-  if (!file.previewData) return "";
-
-  if (file.fileType === "image") {
+  if (file.previewData && file.fileType === "image") {
     return `<img class="message-image-preview" src="${file.previewData}" alt="${escapeHtml(file.originalName)}" />`;
   }
-  if (file.fileType === "audio") {
+  if (file.previewData && file.fileType === "audio") {
     return `<audio class="message-media-preview" controls src="${file.previewData}"></audio>`;
   }
-  if (file.fileType === "video") {
+  if (file.previewData && file.fileType === "video") {
     return `<video class="message-media-preview" controls src="${file.previewData}"></video>`;
+  }
+  if (["image", "audio", "video"].includes(file.fileType)) {
+    return `
+      <button
+        class="load-file-preview"
+        type="button"
+        data-load-preview="${file.id}"
+      >
+        <i data-lucide="${file.fileType === "image" ? "image" : file.fileType === "audio" ? "play" : "film"}"></i>
+        Cargar vista previa
+      </button>
+    `;
   }
 
   return "";
+}
+
+async function loadFilePreview(fileId, button) {
+  const message = state.messages.find((item) => item.file?.id === fileId);
+  if (!message?.file || message.file.previewData) return;
+
+  button.disabled = true;
+  button.classList.add("loading");
+  try {
+    const preview = await api.getFilePreview(fileId);
+    message.file.previewData = preview.dataUrl;
+    renderMessages({ scrollToBottom: false });
+  } catch (error) {
+    button.disabled = false;
+    button.classList.remove("loading");
+    showToast(error.message, "error");
+  }
+}
+
+function isActiveContext(snapshot) {
+  return (
+    snapshot === `${state.activeContext?.type}:${state.activeContext?.id}`
+  );
 }
 
 function fileIcon(fileType) {

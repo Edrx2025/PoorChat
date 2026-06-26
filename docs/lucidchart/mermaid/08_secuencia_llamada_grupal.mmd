@@ -1,0 +1,41 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+sequenceDiagram
+  actor A as Iniciador
+  participant CA as Cliente A
+  participant S as ChatServer
+  participant CS as CallService
+  participant DB as SQLite
+  participant CB as Cliente B
+  participant CC as Cliente C
+  participant U as UdpRelayServer
+
+  A->>CA: Inicia videollamada grupal
+  CA->>S: call:start
+  S->>CS: start(userId, groupId)
+  CS->>DB: verifica llamada activa
+  CS->>DB: crea call + participants
+  CS-->>CB: call:incoming
+  CS-->>CC: call:incoming
+  CS-->>CA: call:updated
+  Note over CB,CC: Cada invitado decide individualmente.
+  CB->>S: call:accept
+  S->>CS: accept(B)
+  CS->>DB: B = joined, call = in_progress
+  CS-->>CA: call:updated
+  CS-->>CB: call:updated
+  CS-->>CC: call:updated (sigue invited)
+  CC->>S: call:reject
+  S->>CS: reject(C)
+  CS->>DB: C = rejected
+  Note over CC: La barra del grupo permanece visible con "Unirse".
+  CC->>S: call:join
+  S->>CS: join(C)
+  CS->>DB: C = joined
+  CA->>U: audio/video UDP
+  U-->>CB: media solo a joined
+  U-->>CC: media solo a joined
+  CB->>U: audio/video UDP
+  U-->>CA: media
+  CC->>S: call:end
+  CS->>DB: C = left
+  Note over CA,U: La llamada termina cuando no queda ningún participante joined.

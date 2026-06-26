@@ -1,0 +1,36 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#eef1ee","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+flowchart LR
+  subgraph CLIENTE["Cliente Electron"]
+    UI["Renderer<br/>HTML + CSS + JavaScript"]
+    PRELOAD["Preload<br/>contextBridge"]
+    MAIN["Proceso Main<br/>IPC y APIs nativas"]
+    TCP["TcpClient"]
+    UDPCLIENT["UdpMediaClient"]
+    UI -->|"API segura"| PRELOAD -->|"IPC"| MAIN
+    MAIN --> TCP
+    MAIN --> UDPCLIENT
+  end
+
+  subgraph SERVIDOR["Servidor Node.js"]
+    CHATSERVER["ChatServer"]
+    SESSION["SessionRegistry"]
+    BUS["EventBus +<br/>NotificationService"]
+    SERVICES["Service Layer<br/>Auth, Chat, Group,<br/>File, Call, Settings"]
+    REPOS["Repositories"]
+    UDPRELAY["UdpRelayServer"]
+    CHATSERVER --> SESSION
+    CHATSERVER --> SERVICES
+    SERVICES --> REPOS
+    SERVICES --> BUS
+    BUS --> CHATSERVER
+  end
+
+  DB[("SQLite")]
+  STORAGE[("storage/uploads")]
+
+  TCP ==>|"TCP 5050<br/>JSON Lines"| CHATSERVER
+  CHATSERVER ==>|"respuestas y eventos"| TCP
+  UDPCLIENT ==>|"UDP 5051<br/>audio y video"| UDPRELAY
+  UDPRELAY ==>|"solo participantes joined"| UDPCLIENT
+  REPOS --> DB
+  SERVICES --> STORAGE

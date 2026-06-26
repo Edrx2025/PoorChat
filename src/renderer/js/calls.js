@@ -407,10 +407,10 @@ export class CallController {
       if (!state.activeCall || video.readyState < 2) return;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataBase64 = canvas
-        .toDataURL("image/jpeg", 0.45)
+        .toDataURL("image/jpeg", 1.0)
         .split(",")[1];
       api.sendMedia({ callId, mediaType: "video", dataBase64 }).catch(() => {});
-    }, 300);
+    }, 50);
   }
 
   handleMedia(media) {

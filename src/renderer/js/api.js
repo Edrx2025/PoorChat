@@ -6,6 +6,16 @@ export const api = {
   openChat: (targetUserId) => window.chad.chat.open({ targetUserId }),
   getMessages: (contextType, contextId) =>
     window.chad.chat.getMessages({ contextType, contextId }),
+  getCachedMessages: (contextType, contextId) =>
+    window.chad.chat.getCachedMessages({ contextType, contextId }),
+  syncMessages: (contextType, contextId) =>
+    window.chad.chat.syncMessages({ contextType, contextId }),
+  loadOlderMessages: (contextType, contextId, beforeMessageId) =>
+    window.chad.chat.loadOlder({
+      contextType,
+      contextId,
+      beforeMessageId,
+    }),
   sendMessage: (contextType, contextId, content, replyToId = null) =>
     window.chad.chat.send({ contextType, contextId, content, replyToId }),
   deleteMessage: (messageId) =>
@@ -27,6 +37,7 @@ export const api = {
   uploadRecordedAudio: (payload) =>
     window.chad.file.uploadRecordedAudio(payload),
   downloadFile: (fileId) => window.chad.file.download({ fileId }),
+  getFilePreview: (fileId) => window.chad.file.getPreview({ fileId }),
   startCall: (payload) => window.chad.call.start(payload),
   acceptCall: (callId) => window.chad.call.accept({ callId }),
   joinCall: (callId) => window.chad.call.join({ callId }),

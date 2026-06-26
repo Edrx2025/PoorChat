@@ -148,6 +148,31 @@ class FileService {
     };
   }
 
+  preview(userId, fileId) {
+    const file = this.fileRepository.findById(fileId);
+    if (!file) throw new Error("El archivo no existe");
+
+    const contextType = file.chatId ? "private" : "group";
+    const contextId = file.chatId || file.groupId;
+    this.chatService.assertContextAccess(userId, contextType, contextId);
+
+    if (!["image", "audio", "video"].includes(file.fileType)) {
+      throw new Error("Este archivo no tiene vista previa");
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      throw new Error("La vista previa supera el límite de 8 MB");
+    }
+    if (!fs.existsSync(file.filePath)) {
+      throw new Error("El archivo ya no está disponible en el servidor");
+    }
+
+    return {
+      fileId: file.id,
+      mimeType: file.mimeType || "application/octet-stream",
+      dataBase64: fs.readFileSync(file.filePath).toString("base64"),
+    };
+  }
+
   list(userId, payload) {
     this.chatService.assertContextAccess(
       userId,
