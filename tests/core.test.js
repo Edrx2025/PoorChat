@@ -548,6 +548,45 @@ test("llamadas aceptadas y rechazadas quedan registradas", () => {
   assert.equal(rejected.status, "rejected");
 });
 
+test("historial de llamadas se puede eliminar por usuario", () => {
+  const user1 = userRepository.findByUsername("user1");
+  const user2 = userRepository.findByUsername("user2");
+
+  const active = callService.start(user1.id, {
+    callType: "audio",
+    receiverId: user2.id,
+  });
+  assert.throws(
+    () => callService.deleteRecord(user1.id, active.id),
+    /llamada activa/,
+  );
+  callService.reject(user2.id, active.id);
+
+  const ended = callService.start(user1.id, {
+    callType: "video",
+    receiverId: user2.id,
+  });
+  callService.accept(user2.id, ended.id);
+  callService.end(user1.id, ended.id);
+
+  assert.ok(callService.list(user1.id).some((call) => call.id === ended.id));
+  assert.ok(callService.list(user2.id).some((call) => call.id === ended.id));
+
+  callService.deleteRecord(user1.id, ended.id);
+  assert.equal(
+    callService.list(user1.id).some((call) => call.id === ended.id),
+    false,
+  );
+  assert.equal(
+    callService.list(user2.id).some((call) => call.id === ended.id),
+    true,
+  );
+
+  const cleared = callService.clearHistory(user2.id);
+  assert.ok(cleared.hiddenCalls >= 1);
+  assert.equal(callService.list(user2.id).length, 0);
+});
+
 test("cada integrante decide si se une a una llamada grupal", () => {
   const user1 = userRepository.findByUsername("user1");
   const user2 = userRepository.findByUsername("user2");

@@ -35,12 +35,13 @@ export function renderConversationList(view, search, onSelect) {
         title: group.name,
         subtitle:
           group.lastMessage ||
-          `${group.members?.length || 0} integrantes`,
+          groupPresenceSummary(group.members || []),
         lastMessageAt: group.lastMessageAt,
         avatar: {
           displayName: group.name,
           avatarData: group.avatar,
         },
+        presence: groupPresenceMeta(group.members || []),
         source: group,
       }));
   } else {
@@ -53,9 +54,12 @@ export function renderConversationList(view, search, onSelect) {
         contextType: "private",
         contextId: chat.id,
         title: chat.peer.displayName,
-        subtitle: chat.lastMessage || `@${chat.peer.username}`,
+        subtitle:
+          chat.lastMessage ||
+          `@${chat.peer.username} · ${statusLabel(chat.peer.status)}`,
         lastMessageAt: chat.lastMessageAt,
         avatar: chat.peer,
+        presence: userPresenceMeta(chat.peer.status),
         source: chat,
       }));
   }
@@ -88,7 +92,12 @@ export function renderConversationList(view, search, onSelect) {
             >
               ${avatarMarkup(item.avatar, "avatar avatar-md")}
               <span class="conversation-item-copy">
-                <strong>${escapeHtml(item.title)}</strong>
+                <span class="conversation-title-line">
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <span class="status-chip ${escapeHtml(item.presence.className)}">
+                    ${escapeHtml(item.presence.label)}
+                  </span>
+                </span>
                 <span>${escapeHtml(item.subtitle)}</span>
               </span>
               <time>${formatDate(item.lastMessageAt)}</time>
@@ -136,12 +145,10 @@ export async function openConversation(item) {
   if (item.contextType === "private") {
     const peer = item.source.peer;
     $("#conversation-subtitle").textContent =
-      peer.status === "online"
-        ? `@${peer.username} · en línea`
-        : `@${peer.username} · ${peer.status || "desconectado"}`;
+      `@${peer.username} · ${statusLabel(peer.status)}`;
   } else {
     $("#conversation-subtitle").textContent =
-      `${item.source.members?.length || 0} integrantes`;
+      groupPresenceSummary(item.source.members || []);
   }
 
   const contextSnapshot = `${item.contextType}:${item.contextId}`;
@@ -159,6 +166,7 @@ export async function openConversation(item) {
   renderMessages();
   renderGroupCallBanner();
   renderDetails();
+  window.dispatchEvent(new CustomEvent("chad:conversation-opened"));
 
   try {
     const synchronized = await api.syncMessages(
@@ -184,14 +192,7 @@ export function renderGroupCallBanner() {
   const banner = $("#group-call-banner");
   if (!banner) return;
 
-  const isGroup = state.activeContext?.type === "group";
-  const call = isGroup
-    ? state.calls.find(
-        (item) =>
-          item.groupId === state.activeContext.id &&
-          ["started", "in_progress"].includes(item.status),
-      )
-    : null;
+  const call = findActiveCallForContext();
 
   $("#audio-call-button").disabled = Boolean(call);
   $("#video-call-button").disabled = Boolean(call);
@@ -208,6 +209,11 @@ export function renderGroupCallBanner() {
     (participant) => participant.status === "joined",
   );
   const hasJoined = currentParticipant?.status === "joined";
+  const actionLabel = hasJoined
+    ? "Abrir"
+    : call.groupId
+      ? "Unirse"
+      : "Aceptar";
 
   banner.innerHTML = `
     <span class="group-call-banner-icon">
@@ -227,7 +233,7 @@ export function renderGroupCallBanner() {
     </div>
     <button id="group-call-action" class="group-call-action" type="button">
       <i data-lucide="${hasJoined ? "maximize-2" : "phone-call"}"></i>
-      ${hasJoined ? "Abrir" : "Unirse"}
+      ${actionLabel}
     </button>
   `;
   banner.classList.remove("hidden");
@@ -519,6 +525,9 @@ export function renderDetails() {
                           <span class="role-badge role-${escapeHtml(member.role || "member")}">
                             ${escapeHtml(roleLabel(member.role))}
                           </span>
+                          <span class="status-chip compact ${escapeHtml(userPresenceMeta(member.status).className)}">
+                            ${escapeHtml(statusLabel(member.status))}
+                          </span>
                         </span>
                       </div>
                       <div class="member-row-actions">
@@ -640,6 +649,60 @@ function roleLabel(role) {
     admin: "Admin",
     member: "Miembro",
   }[role] || "Miembro";
+}
+
+function findActiveCallForContext() {
+  if (!state.activeContext) return null;
+
+  return state.calls.find((call) => {
+    if (!["started", "in_progress"].includes(call.status)) return false;
+    if (state.activeContext.type === "group") {
+      return Number(call.groupId) === Number(state.activeContext.id);
+    }
+    if (state.activeContext.type !== "private" || call.groupId) return false;
+    const peerId = state.activeContext.source?.peer?.id;
+    return [call.callerId, call.receiverId].map(Number).includes(Number(peerId));
+  });
+}
+
+function userPresenceMeta(status) {
+  const normalized = status || "offline";
+  return {
+    label: statusLabel(normalized),
+    className: `status-${normalized}`,
+  };
+}
+
+function groupPresenceMeta(members) {
+  const active = members.filter((member) =>
+    ["online", "busy", "in_call"].includes(member.status),
+  ).length;
+  const inCall = members.filter((member) => member.status === "in_call").length;
+  return {
+    label: inCall ? `${inCall} en llamada` : `${active} activos`,
+    className: inCall ? "status-in_call" : active ? "status-online" : "status-offline",
+  };
+}
+
+function groupPresenceSummary(members) {
+  const active = members.filter((member) =>
+    ["online", "busy", "in_call"].includes(member.status),
+  ).length;
+  const busy = members.filter((member) => member.status === "busy").length;
+  const inCall = members.filter((member) => member.status === "in_call").length;
+  const parts = [`${members.length} integrantes`, `${active} activos`];
+  if (busy) parts.push(`${busy} ocupados`);
+  if (inCall) parts.push(`${inCall} en llamada`);
+  return parts.join(" · ");
+}
+
+function statusLabel(status) {
+  return {
+    online: "Activo",
+    busy: "Ocupado",
+    in_call: "En llamada",
+    offline: "Offline",
+  }[status || "offline"] || "Offline";
 }
 
 function confirmGroupMemberAction(action, targetUserId) {

@@ -225,6 +225,10 @@ class ChatServer {
         return this.callService.reject(user.id, Number(payload.callId));
       case MessageTypes.CALL_END:
         return this.callService.end(user.id, Number(payload.callId));
+      case MessageTypes.CALL_DELETE:
+        return this.callService.deleteRecord(user.id, Number(payload.callId));
+      case MessageTypes.CALL_CLEAR:
+        return this.callService.clearHistory(user.id);
       case MessageTypes.SETTINGS_UPDATE:
         return this.settingsService.updateSettings(user.id, payload);
       case MessageTypes.PROFILE_UPDATE:

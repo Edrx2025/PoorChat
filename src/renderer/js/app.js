@@ -192,6 +192,12 @@ function setupAppEvents() {
     await refreshBootstrap(false);
     switchView("chats");
   });
+  window.addEventListener("chad:calls-changed", () => {
+    if (state.activeView === "calls") {
+      renderCallsView();
+      renderCallsListPane();
+    }
+  });
 }
 
 function setupServerEvents() {
@@ -245,6 +251,13 @@ function setupServerEvents() {
       case "call:incoming":
         if (state.settings.callNotificationsEnabled) {
           callController.showIncoming(message.data);
+        } else {
+          state.calls = [
+            message.data,
+            ...state.calls.filter((call) => call.id !== message.data.id),
+          ];
+          renderGroupCallBanner();
+          if (state.activeView === "calls") renderCallsView();
         }
         break;
       case "call:updated":
@@ -257,7 +270,19 @@ function setupServerEvents() {
       case "user:updated":
         if (message.data.id === state.currentUser.id) {
           state.currentUser = message.data;
+          state.groups = state.groups.map((group) => ({
+            ...group,
+            members: group.members.map((member) =>
+              member.id === message.data.id
+                ? { ...member, ...message.data }
+                : member,
+            ),
+          }));
+          syncActiveGroupContext();
           updateAccountUI();
+          renderCurrentList();
+          renderDetails();
+          renderGroupCallBanner();
         } else {
           state.users = state.users.map((user) =>
             user.id === message.data.id ? message.data : user,
@@ -275,7 +300,11 @@ function setupServerEvents() {
                 : member,
             ),
           }));
+          syncActivePrivateContext();
+          syncActiveGroupContext();
           renderCurrentList();
+          renderDetails();
+          renderGroupCallBanner();
         }
         break;
       case "presence:changed":
@@ -287,6 +316,7 @@ function setupServerEvents() {
   });
 
   window.chad.events.onDisconnected(() => {
+    callController?.hideIncoming();
     callController?.closeCallOverlay();
     showToast("Se perdió la conexión con el servidor", "error", 6000);
   });
@@ -419,7 +449,12 @@ function openNewChatModal() {
               ${avatarMarkup(user, "avatar avatar-sm")}
               <span>
                 <strong>${escapeHtml(user.displayName)}</strong><br />
-                <small>@${escapeHtml(user.username)}</small>
+                <small>
+                  @${escapeHtml(user.username)}
+                  <span class="status-chip compact status-${escapeHtml(user.status || "offline")}">
+                    ${escapeHtml(statusLabel(user.status))}
+                  </span>
+                </small>
               </span>
               <i data-lucide="message-circle"></i>
             </button>
@@ -483,7 +518,7 @@ function syncActiveGroupContext() {
   };
   $("#conversation-title").textContent = group.name;
   $("#conversation-subtitle").textContent =
-    `${group.members?.length || 0} integrantes`;
+    groupPresenceSummary(group.members || []);
   renderDetails();
   renderGroupCallBanner();
 }
@@ -545,22 +580,77 @@ function updateAccountUI() {
 
 function updatePresence(connectedUserIds) {
   const connected = new Set(connectedUserIds.map(Number));
+  const resolveStatus = (user) => {
+    if (!connected.has(user.id)) return "offline";
+    return user.status && user.status !== "offline" ? user.status : "online";
+  };
+
   state.users = state.users.map((user) => ({
     ...user,
-    status: connected.has(user.id) ? "online" : "offline",
+    status: resolveStatus(user),
   }));
   state.privateChats = state.privateChats.map((chat) => ({
     ...chat,
     peer: {
       ...chat.peer,
-      status: connected.has(chat.peer.id) ? "online" : "offline",
+      status: resolveStatus(chat.peer),
     },
   }));
+  state.groups = state.groups.map((group) => ({
+    ...group,
+    members: group.members.map((member) => ({
+      ...member,
+      status: resolveStatus(member),
+    })),
+  }));
+  syncActivePrivateContext();
+  if (state.activeContext?.type === "group") syncActiveGroupContext();
   renderCurrentList();
+  renderDetails();
+  renderGroupCallBanner();
+}
+
+function syncActivePrivateContext() {
+  if (state.activeContext?.type !== "private") return;
+
+  const chat = state.privateChats.find(
+    (item) => item.id === state.activeContext.id,
+  );
+  if (!chat) return;
+
+  state.activeContext.source = chat;
+  state.activeContext.title = chat.peer.displayName;
+  state.activeContext.avatar = chat.peer;
+  $("#conversation-title").textContent = chat.peer.displayName;
+  $("#conversation-subtitle").textContent =
+    `@${chat.peer.username} · ${statusLabel(chat.peer.status)}`;
+  setAvatar($("#conversation-avatar"), chat.peer);
+}
+
+function statusLabel(status) {
+  return {
+    online: "Activo",
+    busy: "Ocupado",
+    in_call: "En llamada",
+    offline: "Offline",
+  }[status || "offline"] || "Offline";
+}
+
+function groupPresenceSummary(members) {
+  const active = members.filter((member) =>
+    ["online", "busy", "in_call"].includes(member.status),
+  ).length;
+  const busy = members.filter((member) => member.status === "busy").length;
+  const inCall = members.filter((member) => member.status === "in_call").length;
+  const parts = [`${members.length} integrantes`, `${active} activos`];
+  if (busy) parts.push(`${busy} ocupados`);
+  if (inCall) parts.push(`${inCall} en llamada`);
+  return parts.join(" · ");
 }
 
 async function handleLogout() {
   try {
+    callController.hideIncoming();
     cancelVoiceRecording();
     if (state.activeCall) {
       await callController.endActive();

@@ -322,6 +322,12 @@ function registerIpcHandlers({
   ipcMain.handle("call:end", (_event, payload) =>
     tcpClient.request(MessageTypes.CALL_END, payload),
   );
+  ipcMain.handle("call:delete-record", (_event, payload) =>
+    tcpClient.request(MessageTypes.CALL_DELETE, payload),
+  );
+  ipcMain.handle("call:clear-history", () =>
+    tcpClient.request(MessageTypes.CALL_CLEAR),
+  );
   ipcMain.handle("settings:update", (_event, payload) =>
     tcpClient.request(MessageTypes.SETTINGS_UPDATE, payload),
   );

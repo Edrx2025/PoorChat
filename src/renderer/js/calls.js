@@ -5,6 +5,7 @@ import {
   avatarMarkup,
   escapeHtml,
   formatDate,
+  openModal,
   renderIcons,
   setAvatar,
   showToast,
@@ -29,6 +30,11 @@ export class CallController {
     this.startedAt = null;
     this.remoteAudioPlayers = new Set();
     this.overlayOpen = false;
+    this.ringtoneContext = null;
+    this.ringtoneTimer = null;
+    this.incomingDrag = null;
+    this.incomingSnapPosition = null;
+    this.incomingDragReady = false;
 
     $("#accept-call-button").addEventListener("click", () => this.acceptIncoming());
     $("#reject-call-button").addEventListener("click", () => this.rejectIncoming());
@@ -44,6 +50,15 @@ export class CallController {
     $("#toggle-camera").addEventListener("click", () => this.toggleTrack("video"));
 
     window.chad.media.onReceived((media) => this.handleMedia(media));
+    window.addEventListener("chad:conversation-opened", () => {
+      if (
+        this.incomingCall &&
+        this.isCallVisibleInActiveContext(this.incomingCall)
+      ) {
+        this.hideIncoming();
+        this.onCallsChanged();
+      }
+    });
     window.addEventListener("beforeunload", () => this.releaseMedia());
     window.addEventListener("pagehide", () => this.releaseMedia());
   }
@@ -78,6 +93,14 @@ export class CallController {
   }
 
   showIncoming(call) {
+    this.syncCallState(call);
+    this.onCallsChanged();
+
+    if (this.isCallVisibleInActiveContext(call)) {
+      this.hideIncoming();
+      return;
+    }
+
     this.incomingCall = call;
     const caller = {
       displayName: call.callerDisplayName,
@@ -97,7 +120,11 @@ export class CallController {
     $("#incoming-accept-label").textContent = call.groupId
       ? "Unirse"
       : "Aceptar";
-    $("#incoming-call").classList.remove("hidden");
+    this.setupIncomingCallDrag();
+    const incoming = $("#incoming-call");
+    incoming.classList.remove("hidden");
+    this.applyIncomingSnapPosition();
+    this.startRingtone();
   }
 
   async acceptIncoming() {
@@ -105,9 +132,9 @@ export class CallController {
 
     try {
       const call = await api.acceptCall(this.incomingCall.id);
-      $("#incoming-call").classList.add("hidden");
-      this.incomingCall = null;
+      this.hideIncoming();
       state.activeCall = call;
+      this.syncCallState(call);
       this.updateCallUI(call, "En curso");
       this.showCallIndicator();
       await this.ensureMediaStarted(call);
@@ -136,9 +163,10 @@ export class CallController {
     }
 
     try {
-      const call = await api.joinCall(knownCall.id);
-      this.incomingCall = null;
-      $("#incoming-call").classList.add("hidden");
+      const call = knownCall.groupId
+        ? await api.joinCall(knownCall.id)
+        : await api.acceptCall(knownCall.id);
+      this.hideIncoming();
       state.activeCall = call;
       state.calls = [
         call,
@@ -159,8 +187,7 @@ export class CallController {
 
     try {
       await api.rejectCall(this.incomingCall.id);
-      $("#incoming-call").classList.add("hidden");
-      this.incomingCall = null;
+      this.hideIncoming();
       this.onCallsChanged();
     } catch (error) {
       showToast(error.message, "error");
@@ -190,8 +217,7 @@ export class CallController {
       this.updateCallUI(call, "En curso");
       this.showCallIndicator();
       if (this.incomingCall?.id === call.id) {
-        this.incomingCall = null;
-        $("#incoming-call").classList.add("hidden");
+        this.hideIncoming();
       }
       await this.ensureMediaStarted(call);
     } else if (
@@ -205,21 +231,21 @@ export class CallController {
     } else if (!joined && activeStatus) {
       if (state.activeCall?.id === call.id) this.closeCallOverlay();
       if (this.incomingCall?.id === call.id) {
-        if (participant?.status === "invited") {
+        if (
+          participant?.status === "invited" &&
+          !this.isCallVisibleInActiveContext(call)
+        ) {
           this.showIncoming(call);
         } else {
-          this.incomingCall = null;
-          $("#incoming-call").classList.add("hidden");
+          this.hideIncoming();
         }
       } else if (participant?.status !== "invited") {
-        this.incomingCall = null;
-        $("#incoming-call").classList.add("hidden");
+        this.hideIncoming();
       }
     } else if (["ended", "rejected", "missed"].includes(call.status)) {
       if (state.activeCall?.id === call.id) this.closeCallOverlay();
       if (this.incomingCall?.id === call.id) {
-        this.incomingCall = null;
-        $("#incoming-call").classList.add("hidden");
+        this.hideIncoming();
       }
     }
 
@@ -259,6 +285,173 @@ export class CallController {
 
   showCallIndicator() {
     $("#active-call-indicator").classList.remove("hidden");
+  }
+
+  hideIncoming() {
+    this.incomingCall = null;
+    $("#incoming-call").classList.add("hidden");
+    this.stopRingtone();
+  }
+
+  syncCallState(call) {
+    state.calls = [
+      call,
+      ...state.calls.filter((existing) => existing.id !== call.id),
+    ];
+  }
+
+  isCallVisibleInActiveContext(call) {
+    if (!state.activeContext || !["started", "in_progress"].includes(call.status)) {
+      return false;
+    }
+
+    const participant = call.participants?.find(
+      (item) => item.id === state.currentUser?.id,
+    );
+    if (participant && !["joined", "invited"].includes(participant.status)) {
+      return false;
+    }
+
+    if (call.groupId) {
+      return (
+        state.activeContext.type === "group" &&
+        Number(state.activeContext.id) === Number(call.groupId)
+      );
+    }
+
+    if (state.activeContext.type !== "private") return false;
+    const peerId = state.activeContext.source?.peer?.id;
+    return [call.callerId, call.receiverId].map(Number).includes(Number(peerId));
+  }
+
+  setupIncomingCallDrag() {
+    if (this.incomingDragReady) return;
+    const incoming = $("#incoming-call");
+    if (!incoming) return;
+    this.incomingDragReady = true;
+
+    incoming.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button")) return;
+      const rect = incoming.getBoundingClientRect();
+      this.incomingDrag = {
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
+      incoming.classList.add("dragging");
+      incoming.setPointerCapture?.(event.pointerId);
+    });
+
+    incoming.addEventListener("pointermove", (event) => {
+      if (!this.incomingDrag) return;
+      const padding = 12;
+      const left = clamp(
+        event.clientX - this.incomingDrag.offsetX,
+        padding,
+        window.innerWidth - this.incomingDrag.width - padding,
+      );
+      const top = clamp(
+        event.clientY - this.incomingDrag.offsetY,
+        padding,
+        window.innerHeight - this.incomingDrag.height - padding,
+      );
+      this.setIncomingPosition(left, top);
+    });
+
+    incoming.addEventListener("pointerup", (event) => {
+      if (!this.incomingDrag) return;
+      incoming.releasePointerCapture?.(event.pointerId);
+      incoming.classList.remove("dragging");
+      const rect = incoming.getBoundingClientRect();
+      this.snapIncomingToWall(rect);
+      this.incomingDrag = null;
+    });
+  }
+
+  setIncomingPosition(left, top) {
+    const incoming = $("#incoming-call");
+    incoming.style.left = `${left}px`;
+    incoming.style.top = `${top}px`;
+    incoming.style.right = "auto";
+    incoming.style.bottom = "auto";
+  }
+
+  snapIncomingToWall(rect) {
+    const padding = 12;
+    const distances = [
+      { wall: "left", value: rect.left },
+      { wall: "right", value: window.innerWidth - rect.right },
+      { wall: "top", value: rect.top },
+      { wall: "bottom", value: window.innerHeight - rect.bottom },
+    ].sort((first, second) => first.value - second.value);
+    const wall = distances[0].wall;
+    const left = clamp(rect.left, padding, window.innerWidth - rect.width - padding);
+    const top = clamp(rect.top, padding, window.innerHeight - rect.height - padding);
+
+    this.incomingSnapPosition = {
+      wall,
+      x: wall === "left"
+        ? padding
+        : wall === "right"
+          ? window.innerWidth - rect.width - padding
+          : left,
+      y: wall === "top"
+        ? padding
+        : wall === "bottom"
+          ? window.innerHeight - rect.height - padding
+          : top,
+    };
+    this.applyIncomingSnapPosition();
+  }
+
+  applyIncomingSnapPosition() {
+    if (!this.incomingSnapPosition) return;
+    this.setIncomingPosition(
+      this.incomingSnapPosition.x,
+      this.incomingSnapPosition.y,
+    );
+  }
+
+  startRingtone() {
+    if (!state.settings?.soundEnabled || this.ringtoneTimer) return;
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    try {
+      this.ringtoneContext ||= new AudioContextClass();
+      const playTone = () => {
+        if (!this.ringtoneContext) return;
+        this.ringtoneContext.resume?.().catch(() => {});
+        const now = this.ringtoneContext.currentTime;
+        this.playTone(740, now, 0.18);
+        this.playTone(988, now + 0.24, 0.2);
+      };
+      playTone();
+      this.ringtoneTimer = setInterval(playTone, 1700);
+    } catch {
+      this.stopRingtone();
+    }
+  }
+
+  playTone(frequency, startAt, duration) {
+    const oscillator = this.ringtoneContext.createOscillator();
+    const gain = this.ringtoneContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    oscillator.connect(gain);
+    gain.connect(this.ringtoneContext.destination);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration + 0.03);
+  }
+
+  stopRingtone() {
+    if (this.ringtoneTimer) clearInterval(this.ringtoneTimer);
+    this.ringtoneTimer = null;
   }
 
   openCallOverlay() {
@@ -721,12 +914,25 @@ export class CallController {
 
 export function renderCallsView() {
   const container = $("#calls-view");
+  const hasHistoryRecords = state.calls.some(
+    (call) => !["started", "in_progress"].includes(call.status),
+  );
   container.innerHTML = `
     <header class="section-heading">
       <div>
         <span class="eyebrow">Actividad reciente</span>
         <h2>Llamadas</h2>
       </div>
+      ${
+        hasHistoryRecords
+          ? `
+            <button id="clear-call-history" class="secondary-button" type="button">
+              <i data-lucide="list-x"></i>
+              Vaciar historial
+            </button>
+          `
+          : ""
+      }
     </header>
     <div class="call-history">
       ${
@@ -737,6 +943,15 @@ export function renderCallsView() {
     </div>
   `;
   renderIcons();
+
+  container.querySelector("#clear-call-history")?.addEventListener("click", () =>
+    confirmClearCallHistory(),
+  );
+  container.querySelectorAll("[data-delete-call-record]").forEach((button) => {
+    button.addEventListener("click", () =>
+      deleteCallRecord(Number(button.dataset.deleteCallRecord)),
+    );
+  });
 }
 
 function callHistoryMarkup(call) {
@@ -746,6 +961,7 @@ function callHistoryMarkup(call) {
     (outgoing ? call.receiverDisplayName : call.callerDisplayName) ||
     "Llamada";
   const icon = call.callType === "video" ? "video" : "phone";
+  const active = ["started", "in_progress"].includes(call.status);
 
   return `
     <article class="call-history-item">
@@ -758,9 +974,74 @@ function callHistoryMarkup(call) {
           ${formatDate(call.createdAt, true)}
         </span>
       </div>
-      <span class="call-status">${escapeHtml(call.status)}</span>
+      <div class="call-history-actions">
+        <span class="call-status">${escapeHtml(call.status)}</span>
+        ${
+          active
+            ? ""
+            : `
+              <button
+                class="member-action danger"
+                type="button"
+                data-delete-call-record="${call.id}"
+                title="Eliminar registro"
+              >
+                <i data-lucide="trash-2"></i>
+              </button>
+            `
+        }
+      </div>
     </article>
   `;
+}
+
+async function deleteCallRecord(callId) {
+  try {
+    await api.deleteCallRecord(callId);
+    state.calls = state.calls.filter((call) => call.id !== callId);
+    renderCallsView();
+    window.dispatchEvent(new CustomEvent("chad:calls-changed"));
+    showToast("Registro de llamada eliminado");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+function confirmClearCallHistory() {
+  const { modal, close } = openModal(`
+    <header class="modal-header">
+      <h2>Vaciar historial</h2>
+      <button class="icon-button modal-close" title="Cerrar">
+        <i data-lucide="x"></i>
+      </button>
+    </header>
+    <p class="confirmation-copy">
+      Se ocultarán todos los registros de llamadas para tu cuenta. Esta acción no afecta a otros usuarios.
+    </p>
+    <div class="modal-actions">
+      <button class="secondary-button modal-close" type="button">Cancelar</button>
+      <button id="confirm-clear-call-history" class="danger-button" type="button">
+        Vaciar historial
+      </button>
+    </div>
+  `);
+
+  modal
+    .querySelector("#confirm-clear-call-history")
+    .addEventListener("click", async () => {
+      try {
+        await api.clearCallHistory();
+        state.calls = state.calls.filter((call) =>
+          ["started", "in_progress"].includes(call.status),
+        );
+        close();
+        renderCallsView();
+        window.dispatchEvent(new CustomEvent("chad:calls-changed"));
+        showToast("Historial de llamadas vaciado");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    });
 }
 
 function downsampleAudio(input, inputRate, outputRate) {
@@ -806,4 +1087,8 @@ function int16ToBase64(samples) {
 
 function base64ToBytes(dataBase64) {
   return Uint8Array.from(atob(dataBase64), (char) => char.charCodeAt(0));
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }

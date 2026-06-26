@@ -28,6 +28,8 @@ module.exports = Object.freeze({
   CALL_JOIN: "call:join",
   CALL_REJECT: "call:reject",
   CALL_END: "call:end",
+  CALL_DELETE: "call:delete-record",
+  CALL_CLEAR: "call:clear-history",
   SETTINGS_UPDATE: "settings:update",
   PROFILE_UPDATE: "user:update-profile",
   PROFILE_AVATAR: "user:update-avatar",

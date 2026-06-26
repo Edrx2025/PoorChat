@@ -56,6 +56,9 @@ contextBridge.exposeInMainWorld("chad", {
     join: (payload) => ipcRenderer.invoke("call:join", payload),
     reject: (payload) => ipcRenderer.invoke("call:reject", payload),
     end: (payload) => ipcRenderer.invoke("call:end", payload),
+    deleteRecord: (payload) =>
+      ipcRenderer.invoke("call:delete-record", payload),
+    clearHistory: () => ipcRenderer.invoke("call:clear-history"),
   },
   settings: {
     update: (payload) => ipcRenderer.invoke("settings:update", payload),
