@@ -6,8 +6,14 @@ class LocalMessageCache {
   constructor(databasePath) {
     fs.mkdirSync(path.dirname(databasePath), { recursive: true });
     this.database = new DatabaseSync(databasePath);
+
+    // 1. AÑADIDO: busy_timeout es obligatorio para evitar "database is locked" en alta concurrencia
+    // synchronous = NORMAL optimiza la escritura en disco al usar el modo WAL
     this.database.exec(`
       PRAGMA journal_mode = WAL;
+      PRAGMA busy_timeout = 5000;
+      PRAGMA synchronous = NORMAL;
+      
       CREATE TABLE IF NOT EXISTS cached_messages (
         server_key TEXT NOT NULL,
         user_id INTEGER NOT NULL,
@@ -41,7 +47,10 @@ class LocalMessageCache {
         PRIMARY KEY (server_key, user_id, context_type, context_id)
       );
     `);
+
     this.identity = null;
+    // 2. AÑADIDO: Cola global para serializar las escrituras que llegan desde el socket TCP
+    this.writeQueue = Promise.resolve();
   }
 
   configure({ host, port, userId }) {
@@ -60,52 +69,66 @@ class LocalMessageCache {
     this.identity = null;
   }
 
+  // 3. AÑADIDO: Se envuelve la lógica síncrona en la cola de promesas
   upsertMessages(contextType, contextId, messages) {
-    if (!this.identity || !Array.isArray(messages) || !messages.length) return;
+    if (!this.identity || !Array.isArray(messages) || !messages.length)
+      return Promise.resolve();
     this.assertContext(contextType, contextId);
 
-    const statement = this.database.prepare(`
-      INSERT INTO cached_messages (
-        server_key,
-        user_id,
-        context_type,
-        context_id,
-        message_id,
-        payload_json,
-        created_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (
-        server_key,
-        user_id,
-        context_type,
-        context_id,
-        message_id
-      ) DO UPDATE SET
-        payload_json = excluded.payload_json,
-        created_at = excluded.created_at
-    `);
+    this.writeQueue = this.writeQueue
+      .then(() => {
+        return new Promise((resolve, reject) => {
+          try {
+            this.database.exec("BEGIN IMMEDIATE");
 
-    this.database.exec("BEGIN IMMEDIATE");
-    try {
-      for (const message of messages) {
-        if (!message?.id) continue;
-        const cacheable = this.toCacheableMessage(message);
-        statement.run(
-          this.identity.serverKey,
-          this.identity.userId,
-          contextType,
-          Number(contextId),
-          Number(message.id),
-          JSON.stringify(cacheable),
-          message.createdAt || null,
-        );
-      }
-      this.database.exec("COMMIT");
-    } catch (error) {
-      this.database.exec("ROLLBACK");
-      throw error;
-    }
+            const statement = this.database.prepare(`
+            INSERT INTO cached_messages (
+              server_key,
+              user_id,
+              context_type,
+              context_id,
+              message_id,
+              payload_json,
+              created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (
+              server_key,
+              user_id,
+              context_type,
+              context_id,
+              message_id
+            ) DO UPDATE SET
+              payload_json = excluded.payload_json,
+              created_at = excluded.created_at
+          `);
+
+            for (const message of messages) {
+              if (!message?.id) continue;
+              const cacheable = this.toCacheableMessage(message);
+              statement.run(
+                this.identity.serverKey,
+                this.identity.userId,
+                contextType,
+                Number(contextId),
+                Number(message.id),
+                JSON.stringify(cacheable),
+                message.createdAt || null,
+              );
+            }
+            this.database.exec("COMMIT");
+            resolve();
+          } catch (error) {
+            if (this.database) this.database.exec("ROLLBACK");
+            reject(error);
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("Error crítico guardando mensajes en caché:", error);
+      });
+
+    return this.writeQueue;
   }
 
   getLatest(contextType, contextId, limit = 100) {
@@ -172,48 +195,71 @@ class LocalMessageCache {
     if (!this.identity) return false;
     this.assertContext(contextType, contextId);
 
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(
+        `
       SELECT initialized
       FROM cached_contexts
       WHERE server_key = ?
         AND user_id = ?
         AND context_type = ?
         AND context_id = ?
-    `).get(
-      this.identity.serverKey,
-      this.identity.userId,
-      contextType,
-      Number(contextId),
-    );
+    `,
+      )
+      .get(
+        this.identity.serverKey,
+        this.identity.userId,
+        contextType,
+        Number(contextId),
+      );
 
     return Boolean(row?.initialized);
   }
 
+  // 4. AÑADIDO: Serializada también para evitar colisiones con upsertMessages
   markInitialized(contextType, contextId) {
-    if (!this.identity) return;
+    if (!this.identity) return Promise.resolve();
     this.assertContext(contextType, contextId);
 
-    this.database.prepare(`
-      INSERT INTO cached_contexts (
-        server_key,
-        user_id,
-        context_type,
-        context_id,
-        initialized
-      )
-      VALUES (?, ?, ?, ?, 1)
-      ON CONFLICT (server_key, user_id, context_type, context_id)
-      DO UPDATE SET initialized = 1
-    `).run(
-      this.identity.serverKey,
-      this.identity.userId,
-      contextType,
-      Number(contextId),
-    );
+    this.writeQueue = this.writeQueue
+      .then(() => {
+        return new Promise((resolve, reject) => {
+          try {
+            this.database
+              .prepare(
+                `
+            INSERT INTO cached_contexts (
+              server_key,
+              user_id,
+              context_type,
+              context_id,
+              initialized
+            )
+            VALUES (?, ?, ?, ?, 1)
+            ON CONFLICT (server_key, user_id, context_type, context_id)
+            DO UPDATE SET initialized = 1
+          `,
+              )
+              .run(
+                this.identity.serverKey,
+                this.identity.userId,
+                contextType,
+                Number(contextId),
+              );
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      })
+      .catch(console.error);
+
+    return this.writeQueue;
   }
 
+  // 5. AÑADIDO: Serializada para proteger la eliminación en bloque
   clearContext(contextType, contextId) {
-    if (!this.identity) return;
+    if (!this.identity) return Promise.resolve();
     this.assertContext(contextType, contextId);
 
     const parameters = [
@@ -222,27 +268,47 @@ class LocalMessageCache {
       contextType,
       Number(contextId),
     ];
-    this.database.exec("BEGIN IMMEDIATE");
-    try {
-      this.database.prepare(`
-        DELETE FROM cached_messages
-        WHERE server_key = ?
-          AND user_id = ?
-          AND context_type = ?
-          AND context_id = ?
-      `).run(...parameters);
-      this.database.prepare(`
-        DELETE FROM cached_contexts
-        WHERE server_key = ?
-          AND user_id = ?
-          AND context_type = ?
-          AND context_id = ?
-      `).run(...parameters);
-      this.database.exec("COMMIT");
-    } catch (error) {
-      this.database.exec("ROLLBACK");
-      throw error;
-    }
+
+    this.writeQueue = this.writeQueue
+      .then(() => {
+        return new Promise((resolve, reject) => {
+          try {
+            this.database.exec("BEGIN IMMEDIATE");
+            this.database
+              .prepare(
+                `
+            DELETE FROM cached_messages
+            WHERE server_key = ?
+              AND user_id = ?
+              AND context_type = ?
+              AND context_id = ?
+          `,
+              )
+              .run(...parameters);
+
+            this.database
+              .prepare(
+                `
+            DELETE FROM cached_contexts
+            WHERE server_key = ?
+              AND user_id = ?
+              AND context_type = ?
+              AND context_id = ?
+          `,
+              )
+              .run(...parameters);
+
+            this.database.exec("COMMIT");
+            resolve();
+          } catch (error) {
+            if (this.database) this.database.exec("ROLLBACK");
+            reject(error);
+          }
+        });
+      })
+      .catch(console.error);
+
+    return this.writeQueue;
   }
 
   close() {
@@ -251,7 +317,8 @@ class LocalMessageCache {
   }
 
   readMessages(sql, contextType, contextId, ...parameters) {
-    return this.database.prepare(sql)
+    return this.database
+      .prepare(sql)
       .all(
         this.identity.serverKey,
         this.identity.userId,
@@ -273,19 +340,23 @@ class LocalMessageCache {
     if (!this.identity) return 0;
     this.assertContext(contextType, contextId);
 
-    const row = this.database.prepare(`
+    const row = this.database
+      .prepare(
+        `
       SELECT COALESCE(${aggregate}(message_id), 0) AS id
       FROM cached_messages
       WHERE server_key = ?
         AND user_id = ?
         AND context_type = ?
         AND context_id = ?
-    `).get(
-      this.identity.serverKey,
-      this.identity.userId,
-      contextType,
-      Number(contextId),
-    );
+    `,
+      )
+      .get(
+        this.identity.serverKey,
+        this.identity.userId,
+        contextType,
+        Number(contextId),
+      );
 
     return Number(row.id);
   }
