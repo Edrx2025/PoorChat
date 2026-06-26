@@ -1,0 +1,34 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+sequenceDiagram
+  actor U as Usuario
+  participant R as Renderer
+  participant M as Electron Main
+  participant T as TcpClient
+  participant S as ChatServer
+  participant A as AuthService
+  participant UR as UserRepository
+  participant DB as SQLite
+
+  U->>R: Ingresa username, contraseña, IP y puerto
+  R->>M: auth:login
+  M->>T: connect(host, port)
+  T->>S: request auth:login (JSON Lines)
+  S->>A: login(payload)
+  A->>UR: findByUsername()
+  UR->>DB: SELECT parametrizado
+  DB-->>UR: usuario + password_hash
+  UR-->>A: usuario
+  A->>A: verifyPassword() con scrypt
+  alt credenciales válidas
+    A->>UR: updateStatus(online)
+    S->>S: SessionRegistry.add()
+    S-->>T: response ok + usuario + udpPort
+    T-->>M: sesión autenticada
+    M-->>R: resultado
+    R->>M: app:bootstrap
+    M->>S: request app:bootstrap
+    S-->>R: usuarios, chats, grupos, llamadas y ajustes
+  else credenciales inválidas o sesión duplicada
+    S-->>T: response ok=false + error
+    T-->>R: mensaje de error visible
+  end

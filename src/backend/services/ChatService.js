@@ -25,22 +25,83 @@ class ChatService {
     return this.chatRepository.listPrivateChatsForUser(userId);
   }
 
-  getMessages(userId, { contextType, contextId }) {
+  getMessages(
+    userId,
+    {
+      contextType,
+      contextId,
+      limit = 100,
+      afterMessageId = null,
+      beforeMessageId = null,
+    },
+  ) {
     this.assertContextAccess(userId, contextType, contextId);
+    const pageLimit = this.normalizePageLimit(limit);
+    const minimumMessageId = this.getMinimumMessageId(
+      userId,
+      contextType,
+      contextId,
+    );
 
     const messages =
       contextType === "private"
         ? this.chatRepository.listMessages({
             chatId: contextId,
-            afterMessageId:
-              this.chatRepository.getClearedThroughMessageId(
-                contextId,
-                userId,
-              ),
+            minimumMessageId,
+            afterMessageId,
+            beforeMessageId,
+            limit: pageLimit,
           })
-        : this.chatRepository.listMessages({ groupId: contextId });
+        : this.chatRepository.listMessages({
+            groupId: contextId,
+            minimumMessageId,
+            afterMessageId,
+            beforeMessageId,
+            limit: pageLimit,
+          });
 
     return messages.map(presentMessage);
+  }
+
+  syncMessages(
+    userId,
+    {
+      contextType,
+      contextId,
+      afterMessageId = null,
+      limit = 100,
+    },
+  ) {
+    this.assertContextAccess(userId, contextType, contextId);
+    const minimumMessageId = this.getMinimumMessageId(
+      userId,
+      contextType,
+      contextId,
+    );
+    const context =
+      contextType === "private"
+        ? { chatId: contextId, minimumMessageId }
+        : { groupId: contextId, minimumMessageId };
+    const latestMessageId = this.chatRepository.getLatestMessageId(context);
+    const checkpoint =
+      afterMessageId === null || afterMessageId === undefined
+        ? null
+        : Number(afterMessageId);
+    const resetRequired =
+      checkpoint !== null &&
+      (checkpoint > latestMessageId || checkpoint < minimumMessageId);
+
+    return {
+      messages: this.getMessages(userId, {
+        contextType,
+        contextId,
+        limit,
+        afterMessageId:
+          resetRequired || checkpoint === null ? null : checkpoint,
+      }),
+      latestMessageId,
+      resetRequired,
+    };
   }
 
   sendText(userId, { contextType, contextId, content, replyToId = null }) {
@@ -240,6 +301,18 @@ class ChatService {
     const contextId = original.chatId || original.groupId;
     const recipients = this.getContextMemberIds(contextType, contextId);
     this.notificationService.notify("message:updated", recipients, updated);
+  }
+
+  getMinimumMessageId(userId, contextType, contextId) {
+    return contextType === "private"
+      ? this.chatRepository.getClearedThroughMessageId(contextId, userId)
+      : 0;
+  }
+
+  normalizePageLimit(limit) {
+    const numericLimit = Number(limit);
+    if (!Number.isFinite(numericLimit)) return 100;
+    return Math.max(1, Math.min(Math.trunc(numericLimit), 100));
   }
 }
 

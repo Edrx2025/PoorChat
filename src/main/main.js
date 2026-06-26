@@ -4,10 +4,12 @@ const { app, BrowserWindow } = require("electron");
 const TcpClient = require("../backend/network/TcpClient");
 const UdpMediaClient = require("../backend/network/UdpMediaClient");
 const registerIpcHandlers = require("./ipcHandlers");
+const LocalMessageCache = require("./LocalMessageCache");
 
 let mainWindow = null;
 const tcpClient = new TcpClient();
 const udpClient = new UdpMediaClient();
+let localMessageCache = null;
 const sessionState = {
   user: null,
   host: null,
@@ -88,11 +90,15 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  localMessageCache = new LocalMessageCache(
+    path.join(app.getPath("userData"), "message-cache.sqlite"),
+  );
   registerIpcHandlers({
     tcpClient,
     udpClient,
     getWindow: () => mainWindow,
     sessionState,
+    localMessageCache,
   });
   createWindow();
 
@@ -104,6 +110,8 @@ app.whenReady().then(() => {
 app.on("before-quit", () => {
   udpClient.stop();
   tcpClient.disconnect();
+  localMessageCache?.close();
+  localMessageCache = null;
 });
 
 app.on("window-all-closed", () => {

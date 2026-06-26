@@ -170,6 +170,53 @@ test("chat privado y persistencia de mensajes", () => {
   assert.ok(history.some((item) => item.id === message.id));
 });
 
+test("historial pagina hacia atrás y sincroniza mensajes nuevos por ID", async () => {
+  const tester = userRepository.findByUsername("tester_updated");
+  const paginationUser = await authService.register({
+    username: "pagination_user",
+    displayName: "Pagination User",
+    password: "123456",
+  });
+  const chat = chatService.openPrivateChat(tester.id, paginationUser.id);
+  const sent = [];
+
+  for (let index = 1; index <= 125; index += 1) {
+    sent.push(
+      chatService.sendText(tester.id, {
+        contextType: "private",
+        contextId: chat.id,
+        content: `Mensaje paginado ${index}`,
+      }),
+    );
+  }
+
+  const latest = chatService.getMessages(paginationUser.id, {
+    contextType: "private",
+    contextId: chat.id,
+  });
+  assert.equal(latest.length, 100);
+  assert.equal(latest[0].id, sent[25].id);
+  assert.equal(latest.at(-1).id, sent.at(-1).id);
+
+  const older = chatService.getMessages(paginationUser.id, {
+    contextType: "private",
+    contextId: chat.id,
+    beforeMessageId: latest[0].id,
+  });
+  assert.equal(older.length, 25);
+  assert.equal(older[0].id, sent[0].id);
+
+  const synchronized = chatService.syncMessages(paginationUser.id, {
+    contextType: "private",
+    contextId: chat.id,
+    afterMessageId: sent[119].id,
+  });
+  assert.equal(synchronized.messages.length, 5);
+  assert.equal(synchronized.messages[0].id, sent[120].id);
+  assert.equal(synchronized.latestMessageId, sent.at(-1).id);
+  assert.equal(synchronized.resetRequired, false);
+});
+
 test("vaciar y eliminar chat son acciones locales del usuario", () => {
   const user1 = userRepository.findByUsername("user1");
   const tester = userRepository.findByUsername("tester_updated");
@@ -470,7 +517,14 @@ test("nota de voz se guarda como mensaje de audio", () => {
   assert.equal(result.file.fileType, "audio");
   assert.equal(result.message.messageType, "audio");
   assert.equal(result.message.reply.id, original.id);
-  assert.match(result.message.file.previewData, /^data:audio\/webm/);
+  assert.equal(result.message.file.previewData, null);
+
+  const preview = fileService.preview(user2.id, result.file.id);
+  assert.match(preview.mimeType, /^audio\/webm/);
+  assert.equal(
+    Buffer.from(preview.dataBase64, "base64").toString(),
+    content.toString(),
+  );
 });
 
 test("llamadas aceptadas y rechazadas quedan registradas", () => {
@@ -492,6 +546,45 @@ test("llamadas aceptadas y rechazadas quedan registradas", () => {
   });
   const rejected = callService.reject(user2.id, video.id);
   assert.equal(rejected.status, "rejected");
+});
+
+test("historial de llamadas se puede eliminar por usuario", () => {
+  const user1 = userRepository.findByUsername("user1");
+  const user2 = userRepository.findByUsername("user2");
+
+  const active = callService.start(user1.id, {
+    callType: "audio",
+    receiverId: user2.id,
+  });
+  assert.throws(
+    () => callService.deleteRecord(user1.id, active.id),
+    /llamada activa/,
+  );
+  callService.reject(user2.id, active.id);
+
+  const ended = callService.start(user1.id, {
+    callType: "video",
+    receiverId: user2.id,
+  });
+  callService.accept(user2.id, ended.id);
+  callService.end(user1.id, ended.id);
+
+  assert.ok(callService.list(user1.id).some((call) => call.id === ended.id));
+  assert.ok(callService.list(user2.id).some((call) => call.id === ended.id));
+
+  callService.deleteRecord(user1.id, ended.id);
+  assert.equal(
+    callService.list(user1.id).some((call) => call.id === ended.id),
+    false,
+  );
+  assert.equal(
+    callService.list(user2.id).some((call) => call.id === ended.id),
+    true,
+  );
+
+  const cleared = callService.clearHistory(user2.id);
+  assert.ok(cleared.hiddenCalls >= 1);
+  assert.equal(callService.list(user2.id).length, 0);
 });
 
 test("cada integrante decide si se une a una llamada grupal", () => {

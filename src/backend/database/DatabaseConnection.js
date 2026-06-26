@@ -22,12 +22,15 @@ class DatabaseConnection {
     const sql = fs.readFileSync(migrationPath, "utf8");
     this.connection.exec(sql);
     this.ensureMessageColumns();
+    this.ensureCallHistoryStateTable();
     this.connection.exec(`
       CREATE INDEX IF NOT EXISTS idx_messages_reply ON messages(reply_to_id);
       CREATE INDEX IF NOT EXISTS idx_messages_pinned_chat ON messages(chat_id, is_pinned);
       CREATE INDEX IF NOT EXISTS idx_messages_pinned_group ON messages(group_id, is_pinned);
       CREATE INDEX IF NOT EXISTS idx_call_participants_status
         ON call_participants(call_id, status);
+      CREATE INDEX IF NOT EXISTS idx_call_history_states_user
+        ON call_history_states(user_id, hidden);
       UPDATE group_members
       SET role = 'owner'
       WHERE user_id = (
@@ -65,6 +68,20 @@ class DatabaseConnection {
         );
       }
     }
+  }
+
+  ensureCallHistoryStateTable() {
+    this.connection.exec(`
+      CREATE TABLE IF NOT EXISTS call_history_states (
+        call_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(call_id, user_id),
+        FOREIGN KEY(call_id) REFERENCES calls(id) ON DELETE CASCADE,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
   }
 
   prepare(sql) {

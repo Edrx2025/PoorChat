@@ -1,0 +1,88 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+classDiagram
+  class ChatServer {
+    +start()
+    +stop()
+    +handleRequest()
+    +bindObservers()
+  }
+  class ClientConnection {
+    +start()
+    +handleData()
+    +requireUser()
+    +sendEvent()
+  }
+  class SessionRegistry {
+    +add()
+    +remove()
+    +sendToUsers()
+    +broadcast()
+  }
+  class EventBus {
+    +getInstance()
+  }
+  class NotificationService {
+    +notify()
+  }
+  class AuthService
+  class ChatService
+  class GroupService
+  class FileService
+  class CallService
+  class SettingsService
+  class BaseRepository
+  class UserRepository
+  class ChatRepository
+  class GroupRepository
+  class FileRepository
+  class CallRepository
+  class SettingsRepository
+  class DatabaseConnection {
+    +getInstance()
+    +prepare()
+    +transaction()
+  }
+  class MessageFactory {
+    +create(type, data)
+  }
+  class CallFactory {
+    +create(type, data)
+  }
+  class Message
+  class FileMessage
+  class Call
+  class AudioCall
+  class VideoCall
+
+  ChatServer *-- ClientConnection
+  ChatServer *-- SessionRegistry
+  ChatServer --> AuthService
+  ChatServer --> ChatService
+  ChatServer --> GroupService
+  ChatServer --> FileService
+  ChatServer --> CallService
+  ChatServer --> SettingsService
+  ChatServer --> EventBus
+  NotificationService --> EventBus
+  AuthService --> UserRepository
+  ChatService --> ChatRepository
+  ChatService --> GroupRepository
+  GroupService --> GroupRepository
+  GroupService --> ChatService
+  FileService --> FileRepository
+  FileService --> ChatService
+  CallService --> CallRepository
+  CallService --> GroupRepository
+  SettingsService --> UserRepository
+  UserRepository --|> BaseRepository
+  ChatRepository --|> BaseRepository
+  GroupRepository --|> BaseRepository
+  FileRepository --|> BaseRepository
+  CallRepository --|> BaseRepository
+  SettingsRepository --|> BaseRepository
+  BaseRepository --> DatabaseConnection
+  ChatService --> MessageFactory
+  CallService --> CallFactory
+  FileMessage --|> Message
+  AudioCall --|> Call
+  VideoCall --|> Call

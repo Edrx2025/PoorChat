@@ -44,7 +44,8 @@ class CallRepository extends BaseRepository {
         cp.left_at AS leftAt,
         u.username,
         u.display_name AS displayName,
-        u.profile_picture AS profilePicture
+        u.profile_picture AS profilePicture,
+        u.status AS userStatus
       FROM call_participants cp
       JOIN users u ON u.id = cp.user_id
       WHERE cp.call_id = ?
@@ -225,10 +226,65 @@ class CallRepository extends BaseRepository {
       LEFT JOIN users receiver ON receiver.id = c.receiver_id
       LEFT JOIN "groups" g ON g.id = c.group_id
       LEFT JOIN group_members gm ON gm.group_id = c.group_id AND gm.user_id = ?
-      WHERE c.caller_id = ? OR c.receiver_id = ? OR gm.user_id = ?
+      LEFT JOIN call_history_states chs
+        ON chs.call_id = c.id
+        AND chs.user_id = ?
+      WHERE (c.caller_id = ? OR c.receiver_id = ? OR gm.user_id = ?)
+        AND COALESCE(chs.hidden, 0) = 0
       ORDER BY c.id DESC
       LIMIT 100
+    `).all(userId, userId, userId, userId, userId);
+  }
+
+  canAccess(callId, userId) {
+    return Boolean(
+      this.prepare(`
+        SELECT 1
+        FROM calls c
+        LEFT JOIN group_members gm
+          ON gm.group_id = c.group_id
+          AND gm.user_id = ?
+        WHERE c.id = ?
+          AND (c.caller_id = ? OR c.receiver_id = ? OR gm.user_id = ?)
+      `).get(userId, callId, userId, userId, userId),
+    );
+  }
+
+  hideForUser(callId, userId) {
+    this.prepare(`
+      INSERT INTO call_history_states (
+        call_id,
+        user_id,
+        hidden,
+        updated_at
+      )
+      VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+      ON CONFLICT(call_id, user_id) DO UPDATE SET
+        hidden = 1,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(callId, userId);
+
+    return { callId, hidden: true };
+  }
+
+  clearForUser(userId) {
+    const calls = this.prepare(`
+      SELECT c.id
+      FROM calls c
+      LEFT JOIN group_members gm
+        ON gm.group_id = c.group_id
+        AND gm.user_id = ?
+      WHERE (c.caller_id = ? OR c.receiver_id = ? OR gm.user_id = ?)
+        AND c.status NOT IN ('started', 'in_progress')
     `).all(userId, userId, userId, userId);
+
+    this.database.transaction(() => {
+      for (const call of calls) {
+        this.hideForUser(call.id, userId);
+      }
+    });
+
+    return { hiddenCalls: calls.length };
   }
 }
 

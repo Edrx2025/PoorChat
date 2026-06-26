@@ -128,6 +128,16 @@ CREATE TABLE IF NOT EXISTS call_participants (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS call_history_states (
+  call_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(call_id, user_id),
+  FOREIGN KEY(call_id) REFERENCES calls(id) ON DELETE CASCADE,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL UNIQUE,
@@ -146,4 +156,6 @@ CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_calls_receiver ON calls(receiver_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_call_participants_status
   ON call_participants(call_id, status);
+CREATE INDEX IF NOT EXISTS idx_call_history_states_user
+  ON call_history_states(user_id, hidden);
 CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);

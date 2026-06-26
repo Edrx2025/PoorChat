@@ -1,0 +1,29 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+sequenceDiagram
+  actor A as Emisor
+  participant RA as Renderer A
+  participant MA as Main A
+  participant S as ChatServer
+  participant CS as ChatService
+  participant CR as ChatRepository
+  participant DB as SQLite
+  participant BUS as EventBus
+  participant MB as Main B
+  participant RB as Renderer B
+
+  A->>RA: Escribe y envía mensaje
+  RA->>MA: chat:send
+  MA->>S: request chat:send
+  S->>CS: sendText(userId, contexto)
+  CS->>CS: valida acceso, contenido y respuesta
+  CS->>CR: createMessage()
+  CR->>DB: INSERT messages
+  DB-->>CR: mensaje persistido
+  CR-->>CS: registro completo
+  CS->>BUS: message:new para miembros
+  BUS->>S: evento con destinatarios
+  S-->>MA: response del emisor
+  S-->>MB: event message:new
+  MA-->>RA: mensaje enviado
+  MB-->>RB: server:event
+  RB->>RB: agrega mensaje y actualiza historial

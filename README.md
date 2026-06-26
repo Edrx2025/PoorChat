@@ -16,6 +16,9 @@ programación orientada a objetos y patrones de diseño.
 - Archivos por chunks mediante TCP.
 - Imágenes, documentos, audio y video.
 - Historial de mensajes y archivos en SQLite.
+- Caché SQLite local por cliente con sincronización incremental por ID.
+- Historial paginado en bloques de hasta 100 mensajes.
+- Vistas previas multimedia cargadas bajo demanda.
 - Llamadas de audio y video con señalización TCP.
 - Audio PCM de baja latencia y frames de video retransmitidos mediante UDP.
 - Notificación flotante de llamada entrante.
@@ -146,6 +149,8 @@ Las pruebas cubren:
 - Llamadas aceptadas y rechazadas.
 - Tema claro.
 - Comunicación TCP real entre dos clientes.
+- Paginación y sincronización incremental del historial.
+- Aislamiento del caché local por servidor y usuario.
 
 ## Arquitectura
 
@@ -154,7 +159,7 @@ Renderer Electron
         |
         | IPC seguro
         v
-Proceso principal Electron
+Proceso principal Electron -------- caché local SQLite
         |
         | TCP: auth, chats, grupos, archivos y llamadas
         v
@@ -167,8 +172,11 @@ Clientes en llamada
         +---- UDP ----> Relay UDP ----> otros participantes
 ```
 
-La interfaz nunca consulta SQLite directamente. Todas las operaciones pasan por
-el servidor.
+El renderer nunca consulta SQLite directamente. El proceso principal guarda un
+caché local de mensajes recientes y el servidor conserva la fuente de verdad.
+Al abrir un chat se muestra primero el caché y después se solicitan únicamente
+los mensajes posteriores al último ID conocido. Al desplazarse hacia arriba se
+cargan páginas anteriores de hasta 100 mensajes.
 
 ## Patrones de diseño utilizados
 
@@ -257,6 +265,11 @@ Tablas:
 
 La base generada se guarda en `database/chad.sqlite` y no se sube al repositorio.
 
+Cada cliente Electron también crea `message-cache.sqlite` dentro de su carpeta
+de datos de usuario. Ese caché separa los mensajes por servidor, puerto, usuario
+y conversación; no reemplaza la base SQL central y puede reconstruirse desde el
+servidor.
+
 ## Archivos
 
 Los archivos se envían por TCP en este orden:
@@ -271,6 +284,11 @@ sus metadatos en SQLite.
 Las notas de voz se graban con `MediaRecorder` en Electron y reutilizan este
 mismo flujo TCP, por lo que quedan disponibles en el historial como mensajes de
 audio.
+
+El historial solo incluye los metadatos del archivo. Las imágenes, notas de voz
+y videos solicitan su vista previa mediante `file:preview` cuando el usuario
+presiona `Cargar vista previa`, evitando repetir contenido Base64 en cada carga
+del chat.
 
 ## Llamadas y videollamadas
 

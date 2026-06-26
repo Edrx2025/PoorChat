@@ -24,9 +24,9 @@
           class="auth-brand-image"
         />
         <div class="auth-brand-copy">
-          <span class="brand-kicker">Chad Desktop</span>
-          <h1>Tu equipo, en un solo lugar.</h1>
-          <p>Mensajes, archivos y llamadas sobre TCP y UDP.</p>
+          <span class="brand-kicker">Chad Business</span>
+          <h1>Comunicación privada para equipos.</h1>
+          <p>Mensajería, archivos y llamadas en una red controlada.</p>
         </div>
         <div class="auth-signal" aria-hidden="true">
           <span></span><span></span><span></span><span></span>
@@ -46,12 +46,12 @@
 
           <form id="login-form" class="auth-form">
             <header>
-              <span class="eyebrow">Bienvenido</span>
-              <h2>Entrar a Chad</h2>
+              <span class="eyebrow">Acceso corporativo</span>
+              <h2>Conectar al espacio de trabajo</h2>
             </header>
 
             <label class="field">
-              <span>Username</span>
+              <span>Usuario</span>
               <input
                 id="login-username"
                 name="username"
@@ -75,11 +75,11 @@
 
             <div class="network-fields">
               <label class="field">
-                <span>Servidor</span>
+                <span>Servidor privado</span>
                 <input id="server-host" value="127.0.0.1" required />
               </label>
               <label class="field compact">
-                <span>Puerto</span>
+                <span>Puerto TCP</span>
                 <input
                   id="server-port"
                   type="number"
@@ -92,7 +92,7 @@
             </div>
 
             <button class="primary-button auth-submit" type="submit">
-              <span>Conectar</span>
+              <span>Ingresar</span>
               <i data-lucide="arrow-right"></i>
             </button>
             <p id="login-feedback" class="form-feedback" aria-live="polite"></p>
@@ -100,8 +100,8 @@
 
           <form id="register-form" class="auth-form hidden">
             <header>
-              <span class="eyebrow">Nueva cuenta</span>
-              <h2>Crear perfil</h2>
+              <span class="eyebrow">Alta de usuario</span>
+              <h2>Crear cuenta empresarial</h2>
             </header>
 
             <label class="field">
@@ -136,7 +136,7 @@
             </label>
 
             <button class="primary-button auth-submit" type="submit">
-              <span>Registrar cuenta</span>
+              <span>Crear usuario</span>
               <i data-lucide="user-plus"></i>
             </button>
             <p
@@ -147,7 +147,7 @@
           </form>
 
           <div class="demo-credentials">
-            <span>Demo</span>
+            <span>Credenciales de prueba</span>
             <code>user1 / 123456</code>
           </div>
         </div>
@@ -203,7 +203,7 @@
 
         <label class="search-box">
           <i data-lucide="search"></i>
-          <input id="list-search" placeholder="Buscar" />
+          <input id="list-search" placeholder="Buscar chats o personas" />
         </label>
 
         <div id="list-content" class="list-content"></div>
@@ -222,7 +222,7 @@
         <section id="empty-state" class="empty-state">
           <img src="assets/chad-mark.png" alt="" />
           <h2>Selecciona una conversación</h2>
-          <p>Inicia un chat, abre un grupo o revisa tus llamadas.</p>
+          <p>Abre un chat, un grupo o revisa el historial de llamadas.</p>
           <button id="empty-new-chat" class="secondary-button">
             <i data-lucide="message-square-plus"></i>
             Nuevo chat

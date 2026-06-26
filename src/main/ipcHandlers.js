@@ -36,6 +36,7 @@ function registerIpcHandlers({
   udpClient,
   getWindow,
   sessionState,
+  localMessageCache,
 }) {
   const config = AppConfig.getInstance();
 
@@ -74,11 +75,113 @@ function registerIpcHandlers({
       getWindow()?.webContents.send("file:progress", progress);
     }
 
-    return tcpClient.request(
+    const result = await tcpClient.request(
       MessageTypes.FILE_UPLOAD_END,
       { transferId: start.transferId },
       30000,
     );
+    cacheMessage(result.message);
+    return result;
+  }
+
+  function getMessageContext(message) {
+    if (message?.chatId) {
+      return { contextType: "private", contextId: Number(message.chatId) };
+    }
+    if (message?.groupId) {
+      return { contextType: "group", contextId: Number(message.groupId) };
+    }
+    return null;
+  }
+
+  function cacheMessage(message) {
+    const context = getMessageContext(message);
+    if (!context) return;
+    localMessageCache.upsertMessages(
+      context.contextType,
+      context.contextId,
+      [message],
+    );
+  }
+
+  async function syncMessages(payload) {
+    const contextType = payload.contextType;
+    const contextId = Number(payload.contextId);
+    const limit = 100;
+    const initialized = localMessageCache.isInitialized(contextType, contextId);
+    let checkpoint = initialized
+      ? localMessageCache.getNewestId(contextType, contextId)
+      : 0;
+    let page = await tcpClient.request(MessageTypes.CHAT_SYNC, {
+      contextType,
+      contextId,
+      afterMessageId: initialized ? checkpoint : null,
+      limit,
+    });
+
+    if (page.resetRequired) {
+      localMessageCache.clearContext(contextType, contextId);
+      checkpoint = 0;
+    }
+    localMessageCache.upsertMessages(contextType, contextId, page.messages);
+
+    let newestId = localMessageCache.getNewestId(contextType, contextId);
+    let remainingPages = 100;
+    while (
+      newestId < Number(page.latestMessageId) &&
+      page.messages.length === limit &&
+      remainingPages > 0
+    ) {
+      page = await tcpClient.request(MessageTypes.CHAT_SYNC, {
+        contextType,
+        contextId,
+        afterMessageId: newestId,
+        limit,
+      });
+      localMessageCache.upsertMessages(contextType, contextId, page.messages);
+      const nextNewestId = localMessageCache.getNewestId(contextType, contextId);
+      if (nextNewestId <= newestId) break;
+      newestId = nextNewestId;
+      remainingPages -= 1;
+    }
+
+    localMessageCache.markInitialized(contextType, contextId);
+    return localMessageCache.getLatest(contextType, contextId, limit);
+  }
+
+  async function loadOlderMessages(payload) {
+    const contextType = payload.contextType;
+    const contextId = Number(payload.contextId);
+    const beforeMessageId = Number(payload.beforeMessageId);
+    const limit = 100;
+    let cached = localMessageCache.getBefore(
+      contextType,
+      contextId,
+      beforeMessageId,
+      limit,
+    );
+    if (cached.length >= limit) return cached;
+
+    const serverBoundary = cached[0]?.id || beforeMessageId;
+    try {
+      const page = await tcpClient.request(MessageTypes.CHAT_MESSAGES, {
+        contextType,
+        contextId,
+        beforeMessageId: serverBoundary,
+        limit,
+      });
+      localMessageCache.upsertMessages(contextType, contextId, page);
+      cached = localMessageCache.getBefore(
+        contextType,
+        contextId,
+        beforeMessageId,
+        limit,
+      );
+    } catch (error) {
+      if (!cached.length) throw error;
+    }
+
+    return cached;
   }
 
   ipcMain.handle("auth:register", async (_event, payload) => {
@@ -91,6 +194,11 @@ function registerIpcHandlers({
     const result = await tcpClient.request(MessageTypes.AUTH_LOGIN, payload);
     sessionState.user = result.user;
     sessionState.udpPort = result.udpPort;
+    localMessageCache.configure({
+      host: sessionState.host,
+      port: sessionState.port,
+      userId: result.user.id,
+    });
 
     udpClient.stop();
     udpClient.start({
@@ -109,6 +217,7 @@ function registerIpcHandlers({
       }
     } finally {
       sessionState.user = null;
+      localMessageCache.resetIdentity();
       udpClient.stop();
       tcpClient.disconnect();
     }
@@ -124,21 +233,44 @@ function registerIpcHandlers({
   ipcMain.handle("chat:get-messages", (_event, payload) =>
     tcpClient.request(MessageTypes.CHAT_MESSAGES, payload),
   );
-  ipcMain.handle("chat:send", (_event, payload) =>
-    tcpClient.request(MessageTypes.CHAT_SEND, payload),
+  ipcMain.handle("chat:get-cached-messages", (_event, payload) =>
+    localMessageCache.getLatest(
+      payload.contextType,
+      Number(payload.contextId),
+      100,
+    ),
   );
-  ipcMain.handle("chat:delete-message", (_event, payload) =>
-    tcpClient.request(MessageTypes.CHAT_DELETE, payload),
+  ipcMain.handle("chat:sync-messages", (_event, payload) =>
+    syncMessages(payload),
   );
-  ipcMain.handle("chat:pin-message", (_event, payload) =>
-    tcpClient.request(MessageTypes.CHAT_PIN, payload),
+  ipcMain.handle("chat:load-older", (_event, payload) =>
+    loadOlderMessages(payload),
   );
-  ipcMain.handle("chat:clear", (_event, payload) =>
-    tcpClient.request(MessageTypes.CHAT_CLEAR, payload),
-  );
-  ipcMain.handle("chat:remove", (_event, payload) =>
-    tcpClient.request(MessageTypes.CHAT_REMOVE, payload),
-  );
+  ipcMain.handle("chat:send", async (_event, payload) => {
+    const message = await tcpClient.request(MessageTypes.CHAT_SEND, payload);
+    cacheMessage(message);
+    return message;
+  });
+  ipcMain.handle("chat:delete-message", async (_event, payload) => {
+    const message = await tcpClient.request(MessageTypes.CHAT_DELETE, payload);
+    cacheMessage(message);
+    return message;
+  });
+  ipcMain.handle("chat:pin-message", async (_event, payload) => {
+    const message = await tcpClient.request(MessageTypes.CHAT_PIN, payload);
+    cacheMessage(message);
+    return message;
+  });
+  ipcMain.handle("chat:clear", async (_event, payload) => {
+    const result = await tcpClient.request(MessageTypes.CHAT_CLEAR, payload);
+    localMessageCache.clearContext("private", Number(payload.chatId));
+    return result;
+  });
+  ipcMain.handle("chat:remove", async (_event, payload) => {
+    const result = await tcpClient.request(MessageTypes.CHAT_REMOVE, payload);
+    localMessageCache.clearContext("private", Number(payload.chatId));
+    return result;
+  });
   ipcMain.handle("group:create", (_event, payload) =>
     tcpClient.request(MessageTypes.GROUP_CREATE, payload),
   );
@@ -151,15 +283,30 @@ function registerIpcHandlers({
   ipcMain.handle("group:remove-member", (_event, payload) =>
     tcpClient.request(MessageTypes.GROUP_REMOVE_MEMBER, payload),
   );
-  ipcMain.handle("group:leave", (_event, payload) =>
-    tcpClient.request(MessageTypes.GROUP_LEAVE, payload),
-  );
-  ipcMain.handle("group:clear", (_event, payload) =>
-    tcpClient.request(MessageTypes.GROUP_CLEAR, payload),
-  );
+  ipcMain.handle("group:leave", async (_event, payload) => {
+    const result = await tcpClient.request(MessageTypes.GROUP_LEAVE, payload);
+    localMessageCache.clearContext("group", Number(payload.groupId));
+    return result;
+  });
+  ipcMain.handle("group:clear", async (_event, payload) => {
+    const result = await tcpClient.request(MessageTypes.GROUP_CLEAR, payload);
+    localMessageCache.clearContext("group", Number(payload.groupId));
+    return result;
+  });
   ipcMain.handle("file:list", (_event, payload) =>
     tcpClient.request(MessageTypes.FILE_LIST, payload),
   );
+  ipcMain.handle("file:get-preview", async (_event, payload) => {
+    const preview = await tcpClient.request(
+      MessageTypes.FILE_PREVIEW,
+      payload,
+      30000,
+    );
+    return {
+      fileId: preview.fileId,
+      dataUrl: `data:${preview.mimeType};base64,${preview.dataBase64}`,
+    };
+  });
   ipcMain.handle("call:start", (_event, payload) =>
     tcpClient.request(MessageTypes.CALL_START, payload),
   );
@@ -174,6 +321,12 @@ function registerIpcHandlers({
   );
   ipcMain.handle("call:end", (_event, payload) =>
     tcpClient.request(MessageTypes.CALL_END, payload),
+  );
+  ipcMain.handle("call:delete-record", (_event, payload) =>
+    tcpClient.request(MessageTypes.CALL_DELETE, payload),
+  );
+  ipcMain.handle("call:clear-history", () =>
+    tcpClient.request(MessageTypes.CALL_CLEAR),
   );
   ipcMain.handle("settings:update", (_event, payload) =>
     tcpClient.request(MessageTypes.SETTINGS_UPDATE, payload),
@@ -307,6 +460,15 @@ function registerIpcHandlers({
   });
 
   tcpClient.on("event", (message) => {
+    if (["message:new", "message:updated"].includes(message.event)) {
+      cacheMessage(message.data);
+    }
+    if (message.event === "group:cleared") {
+      localMessageCache.clearContext("group", Number(message.data.groupId));
+    }
+    if (message.event === "group:removed") {
+      localMessageCache.clearContext("group", Number(message.data.groupId));
+    }
     getWindow()?.webContents.send("server:event", message);
   });
   tcpClient.on("disconnected", () => {

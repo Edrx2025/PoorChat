@@ -116,6 +116,13 @@ class GroupRepository extends BaseRepository {
         g.created_at AS createdAt,
         gm.role,
         (
+          SELECT m.id
+          FROM messages m
+          WHERE m.group_id = g.id
+          ORDER BY m.id DESC
+          LIMIT 1
+        ) AS lastMessageId,
+        (
           SELECT CASE
             WHEN m.deleted_at IS NOT NULL THEN 'Mensaje borrado'
             ELSE m.content

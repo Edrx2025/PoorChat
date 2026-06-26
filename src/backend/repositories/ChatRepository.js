@@ -65,6 +65,14 @@ class ChatRepository extends BaseRepository {
         peer.profile_picture AS peerProfilePicture,
         peer.status AS peerStatus,
         (
+          SELECT m.id
+          FROM messages m
+          WHERE m.chat_id = pc.id
+            AND m.id > COALESCE(pcs.cleared_through_message_id, 0)
+          ORDER BY m.id DESC
+          LIMIT 1
+        ) AS lastMessageId,
+        (
           SELECT CASE
             WHEN m.deleted_at IS NOT NULL THEN 'Mensaje borrado'
             ELSE m.content
@@ -181,53 +189,93 @@ class ChatRepository extends BaseRepository {
     chatId = null,
     groupId = null,
     limit = 100,
-    afterMessageId = 0,
+    minimumMessageId = 0,
+    afterMessageId = null,
+    beforeMessageId = null,
   }) {
-    const contextColumn = chatId ? "m.chat_id" : "m.group_id";
-    const contextId = chatId || groupId;
+    const contextColumn = chatId !== null ? "m.chat_id" : "m.group_id";
+    const contextId = chatId !== null ? chatId : groupId;
+    const conditions = [`${contextColumn} = ?`, "m.id > ?"];
+    const parameters = [contextId, Number(minimumMessageId) || 0];
+
+    if (afterMessageId !== null && afterMessageId !== undefined) {
+      conditions.push("m.id > ?");
+      parameters.push(Number(afterMessageId) || 0);
+    }
+    if (beforeMessageId !== null && beforeMessageId !== undefined) {
+      conditions.push("m.id < ?");
+      parameters.push(Number(beforeMessageId));
+    }
+
+    const ascending = afterMessageId !== null && afterMessageId !== undefined;
+    const query = `
+      SELECT
+        m.id,
+        m.chat_id AS chatId,
+        m.group_id AS groupId,
+        m.sender_id AS senderId,
+        m.content,
+        m.message_type AS messageType,
+        m.file_id AS fileId,
+        m.reply_to_id AS replyToId,
+        m.is_pinned AS isPinned,
+        m.pinned_by AS pinnedBy,
+        m.pinned_at AS pinnedAt,
+        m.deleted_at AS deletedAt,
+        m.deleted_by AS deletedBy,
+        m.deletion_reason AS deletionReason,
+        m.created_at AS createdAt,
+        u.username AS senderUsername,
+        u.display_name AS senderDisplayName,
+        u.profile_picture AS senderProfilePicture,
+        f.original_name AS fileOriginalName,
+        f.file_path AS filePath,
+        f.file_type AS fileType,
+        f.mime_type AS fileMimeType,
+        f.size AS fileSize,
+        replied.content AS replyContent,
+        replied.message_type AS replyMessageType,
+        replied.deleted_at AS replyDeletedAt,
+        reply_user.display_name AS replySenderDisplayName
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      LEFT JOIN files f ON f.id = m.file_id
+      LEFT JOIN messages replied ON replied.id = m.reply_to_id
+      LEFT JOIN users reply_user ON reply_user.id = replied.sender_id
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY m.id ${ascending ? "ASC" : "DESC"}
+      LIMIT ?
+    `;
+    parameters.push(limit);
+
+    if (ascending) {
+      return this.prepare(query).all(...parameters);
+    }
 
     return this.prepare(`
       SELECT *
       FROM (
-        SELECT
-          m.id,
-          m.chat_id AS chatId,
-          m.group_id AS groupId,
-          m.sender_id AS senderId,
-          m.content,
-          m.message_type AS messageType,
-          m.file_id AS fileId,
-          m.reply_to_id AS replyToId,
-          m.is_pinned AS isPinned,
-          m.pinned_by AS pinnedBy,
-          m.pinned_at AS pinnedAt,
-          m.deleted_at AS deletedAt,
-          m.deleted_by AS deletedBy,
-          m.deletion_reason AS deletionReason,
-          m.created_at AS createdAt,
-          u.username AS senderUsername,
-          u.display_name AS senderDisplayName,
-          u.profile_picture AS senderProfilePicture,
-          f.original_name AS fileOriginalName,
-          f.file_path AS filePath,
-          f.file_type AS fileType,
-          f.mime_type AS fileMimeType,
-          f.size AS fileSize,
-          replied.content AS replyContent,
-          replied.message_type AS replyMessageType,
-          replied.deleted_at AS replyDeletedAt,
-          reply_user.display_name AS replySenderDisplayName
-        FROM messages m
-        JOIN users u ON u.id = m.sender_id
-        LEFT JOIN files f ON f.id = m.file_id
-        LEFT JOIN messages replied ON replied.id = m.reply_to_id
-        LEFT JOIN users reply_user ON reply_user.id = replied.sender_id
-        WHERE ${contextColumn} = ? AND m.id > ?
-        ORDER BY m.id DESC
-        LIMIT ?
+        ${query}
       )
       ORDER BY id ASC
-    `).all(contextId, afterMessageId, limit);
+    `).all(...parameters);
+  }
+
+  getLatestMessageId({
+    chatId = null,
+    groupId = null,
+    minimumMessageId = 0,
+  }) {
+    const contextColumn = chatId !== null ? "chat_id" : "group_id";
+    const contextId = chatId !== null ? chatId : groupId;
+
+    return Number(
+      this.prepare(`
+        SELECT COALESCE(MAX(id), 0) AS id
+        FROM messages
+        WHERE ${contextColumn} = ? AND id > ?
+      `).get(contextId, Number(minimumMessageId) || 0).id,
+    );
   }
 
   showPrivateChatForUser(chatId, userId) {

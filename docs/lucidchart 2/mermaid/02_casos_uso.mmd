@@ -1,0 +1,46 @@
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#edf5d1","primaryTextColor":"#182018","primaryBorderColor":"#82964a","lineColor":"#566257","secondaryColor":"#f5f7f5","tertiaryColor":"#ffffff","fontFamily":"Arial"}}}%%
+flowchart LR
+  U["Usuario"]
+  M["Miembro de grupo"]
+  A["Admin"]
+  O["Dueño"]
+
+  subgraph CHAD["Sistema Chad"]
+    AUTH(["Registrarse e iniciar sesión"])
+    PROFILE(["Gestionar perfil y ajustes"])
+    PRIVATE(["Usar chat privado"])
+    FILES(["Enviar y descargar archivos"])
+    VOICE(["Enviar notas de voz"])
+    GROUP(["Crear y usar grupos"])
+    MESSAGE(["Responder, fijar y borrar mensajes"])
+    CALL(["Iniciar o unirse a llamadas"])
+    HISTORY(["Consultar historiales"])
+    LEAVE(["Salir del grupo"])
+    MANAGE(["Editar grupo y agregar miembros"])
+    PROMOTE(["Promover miembros a admin"])
+    KICK(["Expulsar integrantes"])
+    MODERATE(["Borrar mensajes de otros"])
+    CLEAR(["Vaciar chat grupal"])
+  end
+
+  U --> AUTH
+  U --> PROFILE
+  U --> PRIVATE
+  U --> FILES
+  U --> VOICE
+  U --> HISTORY
+  M --> GROUP
+  M --> MESSAGE
+  M --> CALL
+  M --> LEAVE
+  A --> MANAGE
+  A --> PROMOTE
+  A --> KICK
+  A --> MODERATE
+  A --> CLEAR
+  O --> MANAGE
+  O --> PROMOTE
+  O --> KICK
+  O --> MODERATE
+  O --> CLEAR
+  O -. "no puede ser expulsado" .-> KICK

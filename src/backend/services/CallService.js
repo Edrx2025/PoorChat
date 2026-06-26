@@ -1,5 +1,5 @@
 const CallFactory = require("../factories/CallFactory");
-const { presentCall } = require("../utils/presenters");
+const { presentCall, publicUser } = require("../utils/presenters");
 
 class CallService {
   constructor(
@@ -44,7 +44,7 @@ class CallService {
     );
     const presented = this.present(saved);
 
-    this.userRepository.updateStatus(userId, "in_call");
+    this.updateUserStatus(userId, "in_call");
     this.notificationService.notify("call:incoming", recipients, presented);
     this.notificationService.notify(
       "call:updated",
@@ -70,7 +70,7 @@ class CallService {
           this.callRepository.findById(saved.id),
         );
         if (current.status === "started") {
-          this.userRepository.updateStatus(userId, "online");
+          this.updateUserStatus(userId, "online");
         }
         this.notificationService.notify(
           "call:updated",
@@ -94,8 +94,8 @@ class CallService {
     }
     if (!call.groupId) this.clearTimeout(call.id);
 
-    this.userRepository.updateStatus(call.callerId, "in_call");
-    this.userRepository.updateStatus(userId, "in_call");
+    this.updateUserStatus(call.callerId, "in_call");
+    this.updateUserStatus(userId, "in_call");
     const updated = this.present(this.callRepository.findById(call.id));
     this.notificationService.notify(
       "call:updated",
@@ -126,7 +126,7 @@ class CallService {
     if (call.status === "started") {
       this.callRepository.updateStatus(call.id, "in_progress");
     }
-    this.userRepository.updateStatus(userId, "in_call");
+    this.updateUserStatus(userId, "in_call");
 
     const updated = this.present(this.callRepository.findById(call.id));
     this.notificationService.notify(
@@ -152,7 +152,7 @@ class CallService {
         "left",
       );
       this.callRepository.updateStatus(call.id, "rejected");
-      this.userRepository.updateStatus(call.callerId, "online");
+      this.updateUserStatus(call.callerId, "online");
     } else if (
       call.status === "started" &&
       this.callRepository.countParticipantsByStatus(call.id, "invited") === 0
@@ -164,7 +164,7 @@ class CallService {
         "left",
       );
       this.callRepository.updateStatus(call.id, "rejected");
-      this.userRepository.updateStatus(call.callerId, "online");
+      this.updateUserStatus(call.callerId, "online");
     }
 
     const updated = this.present(this.callRepository.findById(call.id));
@@ -185,7 +185,7 @@ class CallService {
 
     if (call.groupId) {
       this.callRepository.updateParticipantStatus(call.id, userId, "left");
-      this.userRepository.updateStatus(userId, "online");
+      this.updateUserStatus(userId, "online");
 
       if (
         this.callRepository.countParticipantsByStatus(call.id, "joined") === 0
@@ -201,7 +201,7 @@ class CallService {
           participantId,
           "left",
         );
-        this.userRepository.updateStatus(participantId, "online");
+        this.updateUserStatus(participantId, "online");
       }
       this.callRepository.updateStatus(call.id, "ended");
     }
@@ -219,6 +219,23 @@ class CallService {
     return this.callRepository
       .listForUser(userId)
       .map((call) => this.present(call));
+  }
+
+  deleteRecord(userId, callId) {
+    const numericCallId = Number(callId);
+    if (!this.callRepository.canAccess(numericCallId, userId)) {
+      throw new Error("No puedes eliminar este registro de llamada");
+    }
+    const call = this.callRepository.findById(numericCallId);
+    if (["started", "in_progress"].includes(call.status)) {
+      throw new Error("No puedes eliminar una llamada activa del historial");
+    }
+
+    return this.callRepository.hideForUser(numericCallId, userId);
+  }
+
+  clearHistory(userId) {
+    return this.callRepository.clearForUser(userId);
   }
 
   getRecipientIds(callId, senderId) {
@@ -286,6 +303,12 @@ class CallService {
     const handle = this.timeoutHandles.get(callId);
     if (handle) clearTimeout(handle);
     this.timeoutHandles.delete(callId);
+  }
+
+  updateUserStatus(userId, status) {
+    const user = this.userRepository.updateStatus(userId, status);
+    this.notificationService.notify("user:updated", [userId], publicUser(user));
+    return user;
   }
 }
 
